@@ -5,8 +5,8 @@ import pandas as pd
 import time
 
 # Exchange setup
-api_key = 'YOUR_BINANCE_API_KEY'
-api_secret = 'YOUR_BINANCE_API_SECRET'
+api_key = 'nHCAKjf112bSWMutN58GEevqhOZ2KqjP91IrW2xXMhbBHGIZuNU76QurKibiFNS9'
+api_secret = '2HFcVh6bJrMNTqUCSJ1ZHjFdteyLxujXSdVXiCkIwt8huJvczA9WqH7mJDfq29yl'
 
 exchange = ccxt.binance({
     'apiKey': api_key,
@@ -14,7 +14,7 @@ exchange = ccxt.binance({
 })
 
 # List of cryptocurrencies to monitor
-symbols = ['BTC/USDT', 'ETH/USDT', 'BNB/USDT']
+symbols = ['BTC/USDT', 'ETH/USDT', 'BNB/USDT','PEPE/USDT']
 
 # Moving averages settings
 short_window = 10  # Short-term moving average
