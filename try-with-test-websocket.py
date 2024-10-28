@@ -10,18 +10,27 @@ import os
 import statistics
 
 # إعداد مفاتيح API الخاصة بك
-api_key = 'tweOjH1Keln44QaxLCr3naevRPgF3j3sYuOpaAg9B7nUT74MyURemvivEUcihfkt'
-api_secret = 'XLlku378D8aZzYg9JjOTtUngA8Q73xBCyy7jGVbqRYSoEICsGBfWC0cIsRptLHxb'
+# api_key = 'ylfzlXcNMinCdkrIwQ4hTiGvcWBfRiavo2luN3teqRPzxFj8YKCgmNBcreWfLHku'
+# api_secret = 'kzObBE8vwRkeySLMClJv1h58EK7Jsh4s0LmmdS8WrF4jAaqxLXod4nt175iezxbk'
+
+
+
+api_key = 'SR8yTMOMfCqYGHxrOUNBL1e4mTY2TTaEMNkZFIZ5glXhHeCCZKhN6CaA6CpmDkjT'
+api_secret = 'tGlNOS1KwAsEu3q6EiqM62yDjrFmYj2l41D4bajYA3KeBcjedZuVFcD8ZQFRe5eI'
+
+
+# api_key = 'tweOjH1Keln44QaxLCr3naevRPgF3j3sYuOpaAg9B7nUT74MyURemvivEUcihfkt'
+# api_secret = 'XLlku378D8aZzYg9JjOTtUngA8Q73xBCyy7jGVbqRYSoEICsGBfWC0cIsRptLHxb'
 
 # تهيئة الاتصال ببايننس واستخدام Testnet
 client = Client(api_key, api_secret)
-client.API_URL = 'https://testnet.binance.vision/api'
+# client.API_URL = 'https://testnet.binance.vision/api'
 
 # إعداد WebSocket للأسعار الفورية لعدة عملات
 current_prices = {}
 active_trades = {}
 trade_history = []
-balance = 100  # الرصيد المبدئي للبوت
+balance = 70  # الرصيد المبدئي للبوت
 
 # ملف CSV لتسجيل التداولات
 csv_file = 'trades_log.csv'
@@ -48,7 +57,7 @@ def get_top_symbols(limit=5):
     return top_symbols
 
 # تحديث قائمة الرموز بناءً على حجم التداول واستقرار السوق
-symbols_to_trade = get_top_symbols(10)
+symbols_to_trade = get_top_symbols(15)
 
 def get_lot_size(symbol):
     exchange_info = client.get_symbol_info(symbol)
@@ -65,7 +74,7 @@ def adjust_quantity(symbol, quantity):
     precision = int(round(-math.log(step_size, 10), 0))
     return round(quantity, precision)
 
-def open_trade_with_dynamic_target(symbol, investment=10, base_profit_target=0.0005, base_stop_loss=0.0001, timeout=1):
+def open_trade_with_dynamic_target(symbol, investment=5, base_profit_target=0.0005, base_stop_loss=0.0001, timeout=1):
     global balance
     price = float(client.get_symbol_ticker(symbol=symbol)['price'])
     avg_volatility = statistics.stdev([float(kline[4]) for kline in client.get_klines(symbol=symbol, interval=Client.KLINE_INTERVAL_15MINUTE, limit=20)])
@@ -144,7 +153,7 @@ def on_open(ws):
     params = [f"{symbol.lower()}@trade" for symbol in symbols_to_trade]
     ws.send(json.dumps({"method": "SUBSCRIBE", "params": params, "id": 1}))
 
-ws = websocket.WebSocketApp("wss://testnet.binance.vision/ws", on_open=on_open, on_message=on_message)
+ws = websocket.WebSocketApp("wss://stream.binance.com:9443/ws", on_open=on_open, on_message=on_message)
 print(f"تم بدء تشغيل البوت في {datetime.now()}")
 websocket_thread = threading.Thread(target=ws.run_forever)
 websocket_thread.start()
