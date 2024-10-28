@@ -6,6 +6,12 @@ import pandas as pd
 import talib as ta
 import schedule
 import time
+import math
+from datetime import datetime
+
+
+
+print(f"تم بدء تشغيل البوت في {datetime.now()}")
 
 # إعداد مفاتيح API الخاصة بك
 api_key = 'tweOjH1Keln44QaxLCr3naevRPgF3j3sYuOpaAg9B7nUT74MyURemvivEUcihfkt'
@@ -45,19 +51,44 @@ def fetch_and_analyze(symbol):
     else:
         return False
 
-# دالة لفتح صفقة مع إعداد إيقاف الخسارة
-def open_trade_with_stop_loss(symbol, investment=10, profit_target=0.005, stop_loss=0.0025):
+
+def get_lot_size(symbol):
+    # الحصول على قواعد التداول للرمز المحدد
+    exchange_info = client.get_symbol_info(symbol)
+    for filter in exchange_info['filters']:
+        if filter['filterType'] == 'LOT_SIZE':
+            step_size = float(filter['stepSize'])
+            return step_size
+    return None
+
+def adjust_quantity(symbol, quantity):
+    step_size = get_lot_size(symbol)
+    if step_size is None:
+        return quantity
+    # تحديد الدقة بناءً على step_size لكل عملة
+    precision = int(round(-math.log(step_size, 10), 0))
+    return round(quantity, precision)
+
+
+
+# تعديل دالة فتح الصفقات مع تحسينات الهدف والمهلة الزمنية
+def open_trade_with_stop_loss(symbol, investment=10, profit_target=0.003, stop_loss=0.0015, timeout=2):
     price = float(client.get_symbol_ticker(symbol=symbol)['price'])
     target_price = price * (1 + profit_target)
     stop_price = price * (1 - stop_loss)
-    quantity = investment / price
+    quantity = adjust_quantity(symbol, investment / price)
     
+    # تنفيذ أمر شراء
     order = client.order_market_buy(
         symbol=symbol,
         quantity=quantity
     )
     
-    print(f"تم فتح صفقة شراء لـ {symbol} بسعر {price}, بهدف {target_price} وإيقاف خسارة عند {stop_price}")
+    print(f"{datetime.now()} - تم فتح صفقة شراء لـ {symbol} بسعر {price}, بهدف {target_price} وإيقاف خسارة عند {stop_price}")
+    
+    # بدء التوقيت
+    start_time = time.time()
+    timeout_seconds = timeout * 60
     
     while True:
         current_price = float(client.get_symbol_ticker(symbol=symbol)['price'])
@@ -67,7 +98,7 @@ def open_trade_with_stop_loss(symbol, investment=10, profit_target=0.005, stop_l
                 symbol=symbol,
                 quantity=quantity
             )
-            print(f"تم جني الأرباح لـ {symbol} عند السعر {current_price}")
+            print(f"{datetime.now()} - تم جني الأرباح لـ {symbol} عند السعر {current_price}")
             break
         
         elif current_price <= stop_price:
@@ -75,8 +106,91 @@ def open_trade_with_stop_loss(symbol, investment=10, profit_target=0.005, stop_l
                 symbol=symbol,
                 quantity=quantity
             )
-            print(f"تم إيقاف الخسارة لـ {symbol} عند السعر {current_price}")
+            print(f"{datetime.now()} - تم إيقاف الخسارة لـ {symbol} عند السعر {current_price}")
             break
+        
+        elif time.time() - start_time >= timeout_seconds:
+            client.order_market_sell(
+                symbol=symbol,
+                quantity=quantity
+            )
+            print(f"{datetime.now()} - انتهت المهلة الزمنية لـ {symbol} وتم إغلاق الصفقة عند السعر {current_price}")
+            break
+        
+        time.sleep(1)
+
+
+# # تحديث دالة فتح الصفقة لتتضمن دقة الكمية
+# def open_trade_with_stop_loss(symbol, investment=10, profit_target=0.005, stop_loss=0.0025):
+#     import math
+#     price = float(client.get_symbol_ticker(symbol=symbol)['price'])
+#     target_price = price * (1 + profit_target)
+#     stop_price = price * (1 - stop_loss)
+    
+#     # حساب الكمية وضبطها
+#     quantity = investment / price
+#     quantity = adjust_quantity(symbol, quantity)
+    
+#     order = client.order_market_buy(
+#         symbol=symbol,
+#         quantity=quantity
+#     )
+    
+#     print(f"تم فتح صفقة شراء لـ {symbol} بسعر {price}, بهدف {target_price} وإيقاف خسارة عند {stop_price}")
+    
+#     while True:
+#         current_price = float(client.get_symbol_ticker(symbol=symbol)['price'])
+        
+#         if current_price >= target_price:
+#             client.order_market_sell(
+#                 symbol=symbol,
+#                 quantity=quantity
+#             )
+#             print(f"تم جني الأرباح لـ {symbol} عند السعر {current_price}")
+#             break
+        
+#         elif current_price <= stop_price:
+#             client.order_market_sell(
+#                 symbol=symbol,
+#                 quantity=quantity
+#             )
+#             print(f"تم إيقاف الخسارة لـ {symbol} عند السعر {current_price}")
+#             break
+
+
+
+# # دالة لفتح صفقة مع إعداد إيقاف الخسارة
+# def open_trade_with_stop_loss(symbol, investment=10, profit_target=0.005, stop_loss=0.0025):
+#     price = float(client.get_symbol_ticker(symbol=symbol)['price'])
+#     target_price = price * (1 + profit_target)
+#     stop_price = price * (1 - stop_loss)
+#     quantity = investment / price
+    
+#     order = client.order_market_buy(
+#         symbol=symbol,
+#         quantity=quantity
+#     )
+    
+#     print(f"تم فتح صفقة شراء لـ {symbol} بسعر {price}, بهدف {target_price} وإيقاف خسارة عند {stop_price}")
+    
+#     while True:
+#         current_price = float(client.get_symbol_ticker(symbol=symbol)['price'])
+        
+#         if current_price >= target_price:
+#             client.order_market_sell(
+#                 symbol=symbol,
+#                 quantity=quantity
+#             )
+#             print(f"تم جني الأرباح لـ {symbol} عند السعر {current_price}")
+#             break
+        
+#         elif current_price <= stop_price:
+#             client.order_market_sell(
+#                 symbol=symbol,
+#                 quantity=quantity
+#             )
+#             print(f"تم إيقاف الخسارة لـ {symbol} عند السعر {current_price}")
+#             break
 
 # دالة لتشغيل البوت على العملات المناسبة
 def execute_bot():
@@ -88,6 +202,10 @@ def execute_bot():
             open_trade_with_stop_loss(symbol)
         except Exception as e:
             print(f"خطأ في فتح صفقة لـ {symbol}: {e}")
+
+
+execute_bot()  # بدء فوري عند تشغيل البرنامج
+# schedule.every(1).minutes.do(execute_bot)
 
 # جدولة تشغيل البوت كل دقيقة
 schedule.every(1).minutes.do(execute_bot)
