@@ -1,32 +1,19 @@
-import websocket
 import json
 from binance.client import Client
 from datetime import datetime
 import math
 import time
-import threading
 import csv
 import os
 import statistics
 
 # إعداد مفاتيح API الخاصة بك
-# api_key = 'ylfzlXcNMinCdkrIwQ4hTiGvcWBfRiavo2luN3teqRPzxFj8YKCgmNBcreWfLHku'
-# api_secret = 'kzObBE8vwRkeySLMClJv1h58EK7Jsh4s0LmmdS8WrF4jAaqxLXod4nt175iezxbk'
-
-
-
 api_key = 'of6qt1T1MpGvlgma1qxwFTLdrGNNVsMj0fKf8LZy1sMf3OqTrwHC7BCRIkgsSsda'
 api_secret = 'MZuALJiqyWMoQ0WkPE6tqWdToGLTHLsap5m95qhPIDtizy1FPD0TQBXNvyQBhgFf'
 
-
-# api_key = 'tweOjH1Keln44QaxLCr3naevRPgF3j3sYuOpaAg9B7nUT74MyURemvivEUcihfkt'
-# api_secret = 'XLlku378D8aZzYg9JjOTtUngA8Q73xBCyy7jGVbqRYSoEICsGBfWC0cIsRptLHxb'
-
-# تهيئة الاتصال ببايننس واستخدام Testnet
 client = Client(api_key, api_secret)
 # client.API_URL = 'https://testnet.binance.vision/api'
 
-# إعداد WebSocket للأسعار الفورية لعدة عملات
 current_prices = {}
 active_trades = {}
 trade_history = []
@@ -39,26 +26,47 @@ if not os.path.exists(csv_file):
         writer = csv.writer(file)
         writer.writerow(['الرمز', 'الكمية', 'السعر الابتدائي', 'سعر الهدف', 'سعر الإيقاف', 'الوقت', 'النتيجة', 'الرصيد المتبقي'])
 
-# الحصول على أفضل العملات بناءً على حجم التداول مع استقرار السوق
-def get_top_symbols(limit=5):
+# تحديث قائمة العملات المتداولة بناءً على حجم التداول
+def update_top_symbols(limit=10):
     tickers = client.get_ticker()
     sorted_tickers = sorted(tickers, key=lambda x: float(x['quoteVolume']), reverse=True)
-    top_symbols = []
-    for ticker in sorted_tickers:
-        if ticker['symbol'].endswith("USDT"):
-            # حساب الاستقرار بناءً على الانحراف المعياري للتغيرات
-            klines = client.get_klines(symbol=ticker['symbol'], interval=Client.KLINE_INTERVAL_1HOUR, limit=24)
-            closing_prices = [float(kline[4]) for kline in klines]
-            stddev = statistics.stdev(closing_prices)
-            if stddev < 0.02:  # مثال: العملة مستقرة لو كان الانحراف المعياري أقل من 2%
-                top_symbols.append(ticker['symbol'])
-            if len(top_symbols) >= limit:
-                break
+    top_symbols = [ticker['symbol'] for ticker in sorted_tickers if ticker['symbol'].endswith("USDT")][:limit]
     return top_symbols
 
-# تحديث قائمة الرموز بناءً على حجم التداول واستقرار السوق
-symbols_to_trade = get_top_symbols(5)
+# تحميل الصفقات المفتوحة من المحفظة
+def load_open_trades_from_portfolio():
+    global balance
+    account_info = client.get_account()
+    for asset in account_info['balances']:
+        if float(asset['free']) > 0:
+            symbol = asset['asset'] + 'USDT'
+            try:
+                price = float(client.get_symbol_ticker(symbol=symbol)['price'])
+                quantity = float(asset['free'])
+                target_price = price * 1.0003  # هدف ربح سريع
+                stop_price = price * 0.9995   # إيقاف خسارة سريع
+                active_trades[symbol] = {
+                    'quantity': quantity,
+                    'initial_price': price,
+                    'target_price': target_price,
+                    'stop_price': stop_price,
+                    'start_time': time.time(),
+                    'timeout': 30  # المهلة الزمنية 30 ثانية
+                }
+                print(f"تم استعادة الصفقة المفتوحة لـ {symbol} من المحفظة.")
+                balance -= quantity * price  # تعديل الرصيد بناءً على الصفقات الحالية
+            except Exception as e:
+                print(f"خطأ في تحميل الصفقة لـ {symbol}: {e}")
 
+# دالة ضبط الكمية بناءً على دقة السوق
+def adjust_quantity(symbol, quantity):
+    step_size = get_lot_size(symbol)
+    if step_size is None:
+        return quantity
+    precision = int(round(-math.log(step_size, 10), 0))
+    return round(quantity, precision)
+
+# دالة تحديد الكمية الصالحة للتداول لكل عملة
 def get_lot_size(symbol):
     exchange_info = client.get_symbol_info(symbol)
     for filter in exchange_info['filters']:
@@ -67,14 +75,8 @@ def get_lot_size(symbol):
             return step_size
     return None
 
-def adjust_quantity(symbol, quantity):
-    step_size = get_lot_size(symbol)
-    if step_size is None:
-        return quantity
-    precision = int(round(-math.log(step_size, 10), 0))
-    return round(quantity, precision)
-
-def open_trade_with_dynamic_target(symbol, investment=1, base_profit_target=0.0005, base_stop_loss=0.0001, timeout=1):
+# استراتيجية فتح صفقة مع هدف ديناميكي
+def open_trade_with_dynamic_target(symbol, investment=0.5, base_profit_target=0.0005, base_stop_loss=0.0001, timeout=1):
     global balance
     price = float(client.get_symbol_ticker(symbol=symbol)['price'])
     avg_volatility = statistics.stdev([float(kline[4]) for kline in client.get_klines(symbol=symbol, interval=Client.KLINE_INTERVAL_15MINUTE, limit=20)])
@@ -107,6 +109,7 @@ def open_trade_with_dynamic_target(symbol, investment=1, base_profit_target=0.00
     }
     print(f"{datetime.now()} - تم فتح صفقة شراء لـ {symbol} بسعر {price}, بهدف {target_price} وإيقاف خسارة عند {stop_price}")
 
+# دالة فحص حالة الصفقات المفتوحة وإغلاقها
 def check_trade_conditions():
     global balance
     for symbol, trade in list(active_trades.items()):
@@ -136,24 +139,22 @@ def check_trade_conditions():
                 writer.writerow([symbol, trade['quantity'], trade['initial_price'], trade['target_price'], trade['stop_price'], datetime.now(), result, balance])
             del active_trades[symbol]
 
-def on_message(ws, message):
-    data = json.loads(message)
-    if 's' in data and 'p' in data:
-        symbol = data['s']
-        price = float(data['p'])
-        previous_price = current_prices.get(symbol)
-        if previous_price is None or abs(price - previous_price) / previous_price > 0.001:
-            current_prices[symbol] = price
-            print(f"{datetime.now()} - تحديث فوري للسعر {symbol}: {price}")
-            if symbol not in active_trades:
-                open_trade_with_dynamic_target(symbol)
+# تحديث قائمة العملات المتداولة بانتظام
+def update_prices_and_trades():
+    symbols_to_trade = update_top_symbols(10)  # إعداد العملات المتداولة في البداية
+    while True:
+        for symbol in symbols_to_trade:
+            try:
+                price = float(client.get_symbol_ticker(symbol=symbol)['price'])
+                current_prices[symbol] = price
+                if symbol not in active_trades:
+                    open_trade_with_dynamic_target(symbol)
+            except Exception as e:
+                print(f"خطأ في تحديث السعر لـ {symbol}: {e}")
         check_trade_conditions()
+        time.sleep(1)  # انتظار لمدة ثانية قبل التحديث التالي
 
-def on_open(ws):
-    params = [f"{symbol.lower()}@trade" for symbol in symbols_to_trade]
-    ws.send(json.dumps({"method": "SUBSCRIBE", "params": params, "id": 1}))
-
-ws = websocket.WebSocketApp("wss://stream.binance.com:9443/ws", on_open=on_open, on_message=on_message)
+# بدء البرنامج
+load_open_trades_from_portfolio()  # تحميل الصفقات المفتوحة عند بدء التشغيل
 print(f"تم بدء تشغيل البوت في {datetime.now()}")
-websocket_thread = threading.Thread(target=ws.run_forever)
-websocket_thread.start()
+update_prices_and_trades()  # بدء عملية التحديث
