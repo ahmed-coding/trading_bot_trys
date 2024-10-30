@@ -18,6 +18,7 @@ WORKDIR /app
 
 # نسخ الملفات المطلوبة وتثبيت المتطلبات
 COPY try-with-test-websocket-2.py /app/
+COPY try-with-test-websocket.py /app/
 COPY requirements.txt /app/
 
 RUN pip install -r requirements.txt
