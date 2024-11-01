@@ -8,27 +8,34 @@ import os
 import statistics
 from binance.exceptions import BinanceAPIException
 import threading
+import requests
+
+
+
+session = requests.Session()
+
+session.headers.update({'timeout': '90'})  # مثال، قد لا تكون فعّالة
 
 # إعداد مفاتيح API الخاصة بك
 
 
-api_key = 'of6qt1T1MpGvlgma1qxwFTLdrGNNVsMj0fKf8LZy1sMf3OqTrwHC7BCRIkgsSsda'
-api_secret = 'MZuALJiqyWMoQ0WkPE6tqWdToGLTHLsap5m95qhPIDtizy1FPD0TQBXNvyQBhgFf'
+# api_key = 'of6qt1T1MpGvlgma1qxwFTLdrGNNVsMj0fKf8LZy1sMf3OqTrwHC7BCRIkgsSsda'
+# api_secret = 'MZuALJiqyWMoQ0WkPE6tqWdToGLTHLsap5m95qhPIDtizy1FPD0TQBXNvyQBhgFf'
 
 
-# api_key = 'tweOjH1Keln44QaxLCr3naevRPgF3j3sYuOpaAg9B7nUT74MyURemvivEUcihfkt'
-# api_secret = 'XLlku378D8aZzYg9JjOTtUngA8Q73xBCyy7jGVbqRYSoEICsGBfWC0cIsRptLHxb'
+api_key = 'tweOjH1Keln44QaxLCr3naevRPgF3j3sYuOpaAg9B7nUT74MyURemvivEUcihfkt'
+api_secret = 'XLlku378D8aZzYg9JjOTtUngA8Q73xBCyy7jGVbqRYSoEICsGBfWC0cIsRptLHxb'
 
 # تهيئة الاتصال ببايننس واستخدام Testnet
 client = Client(api_key, api_secret)
-# client.API_URL = 'https://testnet.binance.vision/api'
+client.API_URL = 'https://testnet.binance.vision/api'
 
 
 # client = Client(api_key, api_secret)
 current_prices = {}
 active_trades = {}
 # إدارة المحفظة 
-balance = 101  # الرصيد المبدئي للبوت
+balance = 103  # الرصيد المبدئي للبوت
 investment=10 # حجم كل صفقة
 base_profit_target=0.0032 # نسبة الربح
 base_stop_loss=0.001 # نسبة الخسارة
@@ -127,7 +134,7 @@ def load_open_trades_from_portfolio():
 
 
 # دالة الحصول على أفضل العملات بناءً على حجم التداول واستقرار السوق ونسبة الربح المستهدفة
-def get_top_symbols(limit=10, profit_target=0.003):
+def get_top_symbols(limit=10, profit_target=0.004):
     tickers = client.get_ticker()
     sorted_tickers = sorted(tickers, key=lambda x: float(x['quoteVolume']), reverse=True)
     top_symbols = []
@@ -306,7 +313,7 @@ def check_trade_conditions():
 def update_symbols_periodically(interval=600):
     global symbols_to_trade
     while True:
-        symbols_to_trade = get_top_symbols(10, profit_target=0.003)
+        symbols_to_trade = get_top_symbols(8, profit_target=0.004)
         print(f"{datetime.now()} - تم تحديث قائمة العملات للتداول: {symbols_to_trade}")
         time.sleep(interval)
 
@@ -336,7 +343,7 @@ def monitor_trades():
 
 # load_open_trades_from_portfolio()
 # بدء التحديث الدوري لقائمة العملات
-symbols_to_trade = get_top_symbols(10, profit_target=0.003)
+symbols_to_trade = get_top_symbols(8, profit_target=0.004)
 symbol_update_thread = threading.Thread(target=update_symbols_periodically, args=(900,))
 symbol_update_thread.start()
 
