@@ -19,27 +19,27 @@ session.headers.update({'timeout': '90'})  # مثال، قد لا تكون فع�
 # إعداد مفاتيح API الخاصة بك
 
 
-# api_key = 'of6qt1T1MpGvlgma1qxwFTLdrGNNVsMj0fKf8LZy1sMf3OqTrwHC7BCRIkgsSsda'
-# api_secret = 'MZuALJiqyWMoQ0WkPE6tqWdToGLTHLsap5m95qhPIDtizy1FPD0TQBXNvyQBhgFf'
+api_key = 'of6qt1T1MpGvlgma1qxwFTLdrGNNVsMj0fKf8LZy1sMf3OqTrwHC7BCRIkgsSsda'
+api_secret = 'MZuALJiqyWMoQ0WkPE6tqWdToGLTHLsap5m95qhPIDtizy1FPD0TQBXNvyQBhgFf'
 
 
-api_key = 'tweOjH1Keln44QaxLCr3naevRPgF3j3sYuOpaAg9B7nUT74MyURemvivEUcihfkt'
-api_secret = 'XLlku378D8aZzYg9JjOTtUngA8Q73xBCyy7jGVbqRYSoEICsGBfWC0cIsRptLHxb'
+# api_key = 'tweOjH1Keln44QaxLCr3naevRPgF3j3sYuOpaAg9B7nUT74MyURemvivEUcihfkt'
+# api_secret = 'XLlku378D8aZzYg9JjOTtUngA8Q73xBCyy7jGVbqRYSoEICsGBfWC0cIsRptLHxb'
 
 # تهيئة الاتصال ببايننس واستخدام Testnet
 client = Client(api_key, api_secret)
-client.API_URL = 'https://testnet.binance.vision/api'
+# client.API_URL = 'https://testnet.binance.vision/api'
 
 
 # client = Client(api_key, api_secret)
 current_prices = {}
 active_trades = {}
 # إدارة المحفظة 
-balance = 103  # الرصيد المبدئي للبوت
-investment=10 # حجم كل صفقة
-base_profit_target=0.0032 # نسبة الربح
-base_stop_loss=0.001 # نسبة الخسارة
-timeout=10 # وقت انتهاء وقت الصفقة
+balance = 80  # الرصيد المبدئي للبوت
+investment=8 # حجم كل صفقة
+base_profit_target=0.004 # نسبة الربح
+base_stop_loss=0.002 # نسبة الخسارة
+timeout=5 # وقت انتهاء وقت الصفقة
 commission_rate = 0.001 # نسبة العمولة للمنصة
 excluded_symbols = set()  # قائمة العملات المستثناة بسبب أخطاء متكررة
 
@@ -141,7 +141,7 @@ def get_top_symbols(limit=10, profit_target=0.004):
     for ticker in sorted_tickers:
         if ticker['symbol'].endswith("USDC") and ticker['symbol'] not in excluded_symbols:
             try:
-                klines = client.get_klines(symbol=ticker['symbol'], interval=Client.KLINE_INTERVAL_5MINUTE, limit=30)
+                klines = client.get_klines(symbol=ticker['symbol'], interval=Client.KLINE_INTERVAL_15MINUTE, limit=30)
                 closing_prices = [float(kline[4]) for kline in klines]
                 stddev = statistics.stdev(closing_prices)
                 
