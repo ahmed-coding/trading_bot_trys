@@ -9,6 +9,7 @@ import statistics
 from binance.exceptions import BinanceAPIException
 import threading
 import requests
+from config import API_KEY, API_SECRET,Settings
 
 
 
@@ -35,13 +36,15 @@ client = Client(api_key, api_secret)
 current_prices = {}
 active_trades = {}
 # إدارة المحفظة 
-balance = 80  # الرصيد المبدئي للبوت
+balance = 81  # الرصيد المبدئي للبوت
 investment=8 # حجم كل صفقة
-base_profit_target=0.004 # نسبة الربح
-base_stop_loss=0.002 # نسبة الخسارة
-timeout=5 # وقت انتهاء وقت الصفقة
-commission_rate = 0.001 # نسبة العمولة للمنصة
+base_profit_target=0.0032 # نسبة الربح
+base_stop_loss=0.01 # نسبة الخسارة
+timeout=15 # وقت انتهاء وقت الصفقة
+commission_rate = 0.002 # نسبة العمولة للمنصة
 excluded_symbols = set()  # قائمة العملات المستثناة بسبب أخطاء متكررة
+bot_settings=Settings()
+symbols_to_trade =[]
 
 # ملف CSV لتسجيل التداولات
 csv_file = 'trades_log.csv'
@@ -76,7 +79,7 @@ def load_open_trades_from_portfolio():
     account_info = client.get_account()
     for asset in account_info['balances']:
         if float(asset['free']) > 0:
-            symbol = asset['asset'] + 'USDC'
+            symbol = asset['asset'] + 'USDT'
             try:
                 price = float(client.get_symbol_ticker(symbol=symbol)['price'])
                 quantity = float(asset['free'])
@@ -104,7 +107,7 @@ def load_open_trades_from_portfolio():
         if 'BNB' in str(asset['asset']):
             continue
         if float(asset['free']) > 0:
-            symbol = asset['asset'] + 'USDC'
+            symbol = asset['asset'] + 'USDT'
             try:
                 price = float(client.get_symbol_ticker(symbol=symbol)['price'])
                 quantity = float(asset['free'])
@@ -133,22 +136,33 @@ def load_open_trades_from_portfolio():
                 print(f"خطأ في تحميل الصفقة لـ {symbol}: {e}")
 
 
+
+def check_bnb_balance(min_bnb_balance=0.0001):  # تقليل الحد الأدنى المطلوب
+    # تحقق من رصيد BNB للتأكد من تغطية الرسوم
+    account_info = client.get_asset_balance(asset='BNB')
+    if account_info:
+        bnb_balance = float(account_info['free'])
+        return bnb_balance >= min_bnb_balance
+    return False
+
 # دالة الحصول على أفضل العملات بناءً على حجم التداول واستقرار السوق ونسبة الربح المستهدفة
-def get_top_symbols(limit=10, profit_target=0.004):
+def get_top_symbols(limit=10, profit_target=0.005):
     tickers = client.get_ticker()
     sorted_tickers = sorted(tickers, key=lambda x: float(x['quoteVolume']), reverse=True)
     top_symbols = []
+    # top_symbols.append("NEIROUSDT")
     for ticker in sorted_tickers:
-        if ticker['symbol'].endswith("USDC") and ticker['symbol'] not in excluded_symbols:
+        if ticker['symbol'].endswith("USDT") and ticker['symbol'] not in excluded_symbols  and  "XRPUSDT" not in  ticker['symbol']:
+            # top_symbols.append(tickers[''])
             try:
-                klines = client.get_klines(symbol=ticker['symbol'], interval=Client.KLINE_INTERVAL_15MINUTE, limit=30)
+                klines = client.get_klines(symbol=ticker['symbol'], interval=Client.KLINE_INTERVAL_5MINUTE, limit=10)
                 closing_prices = [float(kline[4]) for kline in klines]
                 stddev = statistics.stdev(closing_prices)
                 
                 avg_price = sum(closing_prices) / len(closing_prices)
                 volatility_ratio = stddev / avg_price
 
-                if stddev < 0.03 and volatility_ratio >= profit_target:
+                if stddev < 0.04 and volatility_ratio >= profit_target:
                     top_symbols.append(ticker['symbol'])
                     print(f"تم اختيار العملة {ticker['symbol']} بنسبة تذبذب {volatility_ratio:.4f}")
                 
@@ -176,22 +190,23 @@ def get_lot_size(symbol):
     return None
 
 
-def check_bnb_balance(min_bnb_balance=0.001):  # تقليل الحد الأدنى المطلوب
-    # تحقق من رصيد BNB للتأكد من تغطية الرسوم
-    account_info = client.get_asset_balance(asset='BNB')
-    if account_info:
-        bnb_balance = float(account_info['free'])
-        return bnb_balance >= min_bnb_balance
-    return False
+
 
 def open_trade_with_dynamic_target(symbol, investment=2.5, base_profit_target=0.002, base_stop_loss=0.0005, timeout=3):
     global balance, commission_rate
+    # trading_status= bot_settings.trading_status()
+    # if trading_status =="0":
+    #     print("the trading is of can't open more trad")
+    #     return
+
     price = float(client.get_symbol_ticker(symbol=symbol)['price'])
-    avg_volatility = statistics.stdev([float(kline[4]) for kline in client.get_klines(symbol=symbol, interval=Client.KLINE_INTERVAL_15MINUTE, limit=20)])
+    avg_volatility = statistics.stdev([float(kline[4]) for kline in client.get_klines(symbol=symbol, interval=Client.KLINE_INTERVAL_5MINUTE, limit=20)])
     
     # تضمين العمولات وتعديل أهداف الربح والخسارة
     profit_target = base_profit_target + avg_volatility + commission_rate
+    # print(f"profit_target: {profit_target}")
     stop_loss = base_stop_loss + avg_volatility * 0.5 + commission_rate
+    # print(f"stop_loss: {stop_loss}")
     target_price = price * (1 + profit_target)
     stop_price = price * (1 - stop_loss)
     quantity = adjust_quantity(symbol, investment / price)
@@ -223,7 +238,7 @@ def open_trade_with_dynamic_target(symbol, investment=2.5, base_profit_target=0.
         adjust_balance(investment, action="buy")
         print(f"{datetime.now()} - تم فتح صفقة شراء لـ {symbol} بسعر {price}, بهدف {target_price} وإيقاف خسارة عند {stop_price}")
     except BinanceAPIException as e:
-        if 'NOTIONAL' in str(e) or 'Invalid symbol' in str(e):
+        if 'NOTIONAL' in str(e) or 'Invalid symbol' in str(e) or 'Market is closed' in str(e):
                 excluded_symbols.add(symbol)
         print(f"خطأ في فتح الصفقة لـ {symbol}: {e}")
 
@@ -233,7 +248,7 @@ def sell_trade(symbol, trade_quantity):
     
     try:
         # الحصول على الكمية المتاحة في المحفظة
-        balance_info = client.get_asset_balance(asset=symbol.replace("USDC", ""))
+        balance_info = client.get_asset_balance(asset=symbol.replace("USDT", ""))
         available_quantity = float(balance_info['free'])
         
         # التأكد من أن الكمية تلبي الحد الأدنى لـ LOT_SIZE وتعديل الدقة المناسبة
@@ -284,8 +299,10 @@ def check_trade_conditions():
             elif current_price <= trade['stop_price']:
                 sold_quantity = sell_trade(symbol, trade['quantity'])
                 result = 'خسارة' if sold_quantity > 0 else None
+                # excluded_symbols.add(symbol)
             elif time.time() - trade['start_time'] >= trade['timeout']:
                 sold_quantity = sell_trade(symbol, trade['quantity'])
+                # excluded_symbols.add(symbol)
                 result = 'انتهاء المهلة' if sold_quantity > 0 else None
                 
 
@@ -313,12 +330,14 @@ def check_trade_conditions():
 def update_symbols_periodically(interval=600):
     global symbols_to_trade
     while True:
-        symbols_to_trade = get_top_symbols(8, profit_target=0.004)
+        symbols_to_trade = get_top_symbols(10)
         print(f"{datetime.now()} - تم تحديث قائمة العملات للتداول: {symbols_to_trade}")
         time.sleep(interval)
 
 # مراقبة تحديث الأسعار وفتح الصفقات
 def update_prices():
+    global symbols_to_trade
+
     while True:
         for symbol in symbols_to_trade:
             if symbol in excluded_symbols:
@@ -332,25 +351,40 @@ def update_prices():
                 print(f"خطأ في تحديث السعر لـ {symbol}: {e}")
                 if 'NOTIONAL' in str(e) or 'Invalid symbol' in str(e):
                     excluded_symbols.add(symbol)  # Exclude symbols causing frequent errors
+                    time.sleep(0.1)
 
 # مراقبة حالة الصفقات المغلقة
 def monitor_trades():
     while True:
         check_trade_conditions()
+        time.sleep(0.1)
+
 
 # load_open_trades_from_portfolio()
 
 
 # load_open_trades_from_portfolio()
 # بدء التحديث الدوري لقائمة العملات
-symbols_to_trade = get_top_symbols(8, profit_target=0.004)
-symbol_update_thread = threading.Thread(target=update_symbols_periodically, args=(900,))
-symbol_update_thread.start()
+def run_bot():
+    global symbols_to_trade
 
-# تشغيل خيوط تحديث الأسعار ومراقبة الصفقات
-price_thread = threading.Thread(target=update_prices)
-trade_thread = threading.Thread(target=monitor_trades)
-price_thread.start()
-trade_thread.start()
+    symbols_to_trade = get_top_symbols(10)
+    symbol_update_thread = threading.Thread(target=update_symbols_periodically, args=(900,))
+    symbol_update_thread.start()
 
-print(f"تم بدء تشغيل البوت في {datetime.now()}")
+    # تشغيل خيوط تحديث الأسعار ومراقبة الصفقات
+    price_thread = threading.Thread(target=update_prices)
+    trade_thread = threading.Thread(target=monitor_trades)
+    price_thread.start()
+    trade_thread.start()
+
+    print(f"تم بدء تشغيل البوت في {datetime.now()}")
+    
+    
+
+if __name__ == "__main__":
+    if bot_settings.bot_status() != '0':
+            run_bot()
+            
+    print("Bot is turn of")
+        
