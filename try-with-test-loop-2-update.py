@@ -37,10 +37,10 @@ client = Client(api_key, api_secret)
 current_prices = {}
 active_trades = {}
 # إدارة المحفظة 
-balance = 75  # الرصيد المبدئي للبوت
+balance = 70  # الرصيد المبدئي للبوت
 investment=6 # حجم كل صفقة
-base_profit_target=0.0032 # نسبة الربح
-base_stop_loss=0.01 # نسبة الخسارة
+base_profit_target=0.0036 # نسبة الربح
+base_stop_loss=0.006 # نسبة الخسارة
 timeout=15 # وقت انتهاء وقت الصفقة
 commission_rate = 0.002 # نسبة العمولة للمنصة
 excluded_symbols = set()  # قائمة العملات المستثناة بسبب أخطاء متكررة
@@ -279,9 +279,9 @@ def open_trade_with_dynamic_target(symbol, investment=2.5, base_profit_target=0.
         print(f"{datetime.now()} - الرصيد الحالي غير كافٍ لفتح صفقة جديدة.")
         return
     
-    if not check_bnb_balance():
-        print(f"{datetime.now()} - الرصيد غير كافٍ من BNB لتغطية الرسوم. يرجى إيداع BNB.")
-        return
+    # if not check_bnb_balance():
+    #     print(f"{datetime.now()} - الرصيد غير كافٍ من BNB لتغطية الرسوم. يرجى إيداع BNB.")
+    #     return
 
     
     price = float(client.get_symbol_ticker(symbol=symbol)['price'])
@@ -454,7 +454,7 @@ def run_bot():
     global symbols_to_trade
 
     symbols_to_trade = get_top_symbols(10)
-    symbol_update_thread = threading.Thread(target=update_symbols_periodically, args=(900,))
+    symbol_update_thread = threading.Thread(target=update_symbols_periodically, args=(1200,))
     symbol_update_thread.start()
 
     # تشغيل خيوط تحديث الأسعار ومراقبة الصفقات
