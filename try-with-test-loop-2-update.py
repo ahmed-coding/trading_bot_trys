@@ -10,6 +10,7 @@ from binance.exceptions import BinanceAPIException
 import threading
 import requests
 from config import API_KEY, API_SECRET,Settings
+# import talib  # مكتبة تحليل فني
 
 
 
@@ -36,8 +37,8 @@ client = Client(api_key, api_secret)
 current_prices = {}
 active_trades = {}
 # إدارة المحفظة 
-balance = 81  # الرصيد المبدئي للبوت
-investment=8 # حجم كل صفقة
+balance = 75  # الرصيد المبدئي للبوت
+investment=6 # حجم كل صفقة
 base_profit_target=0.0032 # نسبة الربح
 base_stop_loss=0.01 # نسبة الخسارة
 timeout=15 # وقت انتهاء وقت الصفقة
@@ -45,13 +46,28 @@ commission_rate = 0.002 # نسبة العمولة للمنصة
 excluded_symbols = set()  # قائمة العملات المستثناة بسبب أخطاء متكررة
 bot_settings=Settings()
 symbols_to_trade =[]
+last_trade_time = {}
+
+
 
 # ملف CSV لتسجيل التداولات
-csv_file = 'trades_log.csv'
+csv_file = 'update_trades_log_test.csv'
 if not os.path.exists(csv_file):
     with open(csv_file, mode='w', newline='', encoding='utf-8') as file:
         writer = csv.writer(file)
-        writer.writerow(['الرمز', 'الكمية', 'السعر الابتدائي', 'سعر الهدف', 'سعر الإيقاف', 'الوقت', 'النتيجة', 'الرصيد المتبقي'])
+        writer.writerow(['الرمز', 'الكمية', 'السعر الابتدائي', 'سعر الهدف', 'سعر الإيقاف', 'وقت الاغلاق', 'وقت الفتح','نسبة الربح','نسبة الخسارة','المهلة', 'الربح','النتيجة', 'الرصيد المتبقي'])
+
+
+# حساب RSI
+def calculate_rsi(prices, period=14):
+    deltas = [prices[i] - prices[i - 1] for i in range(1, len(prices))]
+    gains = [d for d in deltas if d > 0]
+    losses = [-d for d in deltas if d < 0]
+    avg_gain = sum(gains) / period
+    avg_loss = sum(losses) / period
+    rs = avg_gain / avg_loss if avg_loss != 0 else 0
+    rsi = 100 - (100 / (1 + rs))
+    return rsi
 
 
 def adjust_balance(amount, action="buy"):
@@ -66,13 +82,21 @@ def adjust_balance(amount, action="buy"):
     global balance, commission_rate
     commission = amount * commission_rate
     if action == "buy":
-        balance -= (amount + commission)  # خصم المبلغ + العمولة
+        balance -= (amount -( commission * 0.5))  # خصم المبلغ + العمولة
     elif action == "sell":
-        balance += amount - commission  # إضافة المبلغ بعد خصم العمولة
+        balance += amount - (commission * 0.5) # إضافة المبلغ بعد خصم العمولة
     
     print(f"تم تحديث الرصيد بعد {action} - الرصيد المتبقي: {balance}")
     return balance
 
+
+# ضبط الرصيد بعد عملية تداول
+# def adjust_balance(amount, action="buy"):
+#     global balance
+#     commission = amount * commission_rate
+#     balance += (amount - commission * 0.5) if action == "sell" else -amount + (commission * 0.5)
+#     print(f"تم تحديث الرصيد بعد {action} - الرصيد المتبقي: {balance}")
+#     return balance
 
 # تحميل الصفقات المفتوحة من المحفظة
 def load_open_trades_from_portfolio():
@@ -120,26 +144,30 @@ def check_bnb_balance(min_bnb_balance=0.0001):  # تقليل الحد الأدن
         return bnb_balance >= min_bnb_balance
     return False
 
-# دالة الحصول على أفضل العملات بناءً على حجم التداول واستقرار السوق ونسبة الربح المستهدفة
-def get_top_symbols(limit=10, profit_target=0.005):
+
+# تعديل دالة اختيار أفضل العملات لتشمل مؤشر RSI
+def get_top_symbols(limit=10, profit_target=0.009, rsi_threshold=70):
     tickers = client.get_ticker()
     sorted_tickers = sorted(tickers, key=lambda x: float(x['quoteVolume']), reverse=True)
     top_symbols = []
-    # top_symbols.append("NEIROUSDT")
+    
     for ticker in sorted_tickers:
-        if ticker['symbol'].endswith("USDT") and ticker['symbol'] not in excluded_symbols  and  "XRPUSDT" not in  ticker['symbol']:
-            # top_symbols.append(tickers[''])
+        if ticker['symbol'].endswith("USDT") and ticker['symbol'] not in excluded_symbols:
             try:
-                klines = client.get_klines(symbol=ticker['symbol'], interval=Client.KLINE_INTERVAL_5MINUTE, limit=10)
+                klines = client.get_klines(symbol=ticker['symbol'], interval=Client.KLINE_INTERVAL_5MINUTE, limit=20)
                 closing_prices = [float(kline[4]) for kline in klines]
                 stddev = statistics.stdev(closing_prices)
                 
+                # حساب مؤشر RSI
+                rsi = calculate_rsi(closing_prices)
+                
+                # اختيار العملة بناءً على التذبذب ومؤشر RSI
                 avg_price = sum(closing_prices) / len(closing_prices)
                 volatility_ratio = stddev / avg_price
 
-                if stddev < 0.04 and volatility_ratio >= profit_target:
+                if stddev < 0.04 and volatility_ratio >= profit_target and rsi < rsi_threshold:
                     top_symbols.append(ticker['symbol'])
-                    print(f"تم اختيار العملة {ticker['symbol']} بنسبة تذبذب {volatility_ratio:.4f}")
+                    print(f"تم اختيار العملة {ticker['symbol']} بنسبة تذبذب {volatility_ratio:.4f} و RSI {rsi:.2f}")
                 
                 if len(top_symbols) >= limit:
                     break
@@ -147,6 +175,7 @@ def get_top_symbols(limit=10, profit_target=0.005):
                 print(f"خطأ في جلب بيانات {ticker['symbol']}: {e}")
                 excluded_symbols.add(ticker['symbol'])
     return top_symbols
+
 
 # دالة ضبط الكمية بناءً على دقة السوق
 def adjust_quantity(symbol, quantity):
@@ -167,39 +196,116 @@ def get_lot_size(symbol):
 
 
 
-def open_trade_with_dynamic_target(symbol, investment=2.5, base_profit_target=0.002, base_stop_loss=0.0005, timeout=3):
-    global balance, commission_rate
+# def open_trade_with_dynamic_target(symbol, investment=2.5, base_profit_target=0.002, base_stop_loss=0.0005, timeout=3):
+#     global balance, commission_rate
+#     # trading_status= bot_settings.trading_status()
+#     # if trading_status =="0":
+#     #     print("the trading is of can't open more trad")
+#     #     return
+
+#     price = float(client.get_symbol_ticker(symbol=symbol)['price'])
+#     avg_volatility = statistics.stdev([float(kline[4]) for kline in client.get_klines(symbol=symbol, interval=Client.KLINE_INTERVAL_5MINUTE, limit=20)])
+    
+#     # تضمين العمولات وتعديل أهداف الربح والخسارة
+#     profit_target = base_profit_target + avg_volatility + commission_rate
+#     # print(f"profit_target: {profit_target}")
+#     stop_loss = base_stop_loss + avg_volatility * 0.5 + commission_rate
+#     # print(f"stop_loss: {stop_loss}")
+#     target_price = price * (1 + profit_target)
+#     stop_price = price * (1 - stop_loss)
+#     quantity = adjust_quantity(symbol, investment / price)
+#     notional_value = quantity * price
+
+#     if balance < investment:
+#         print(f"{datetime.now()} - الرصيد الحالي غير كافٍ لفتح صفقة جديدة.")
+#         return
+
+#     if not check_bnb_balance():
+#         print(f"{datetime.now()} - الرصيد غير كافٍ من BNB لتغطية الرسوم. يرجى إيداع BNB.")
+#         return
+
+#     # تنفيذ أمر شراء
+#     try:
+#         order = client.order_market_buy(symbol=symbol, quantity=quantity)
+#         commission = investment * commission_rate
+#         # تخزين تفاصيل الصفقة في active_trades
+#         active_trades[symbol] = {
+#             'quantity': quantity,
+#             'initial_price': price,
+#             'target_price': target_price,
+#             'stop_price': stop_price,
+#             'start_time': time.time(),
+#             'timeout': timeout * 60,
+#             'investment': investment - commission
+#         }
+#         # balance -= investment
+#         adjust_balance(investment, action="buy")
+#         print(f"{datetime.now()} - تم فتح صفقة شراء لـ {symbol} بسعر {price}, بهدف {target_price} وإيقاف خسارة عند {stop_price}")
+#     except BinanceAPIException as e:
+#         if 'NOTIONAL' in str(e) or 'Invalid symbol' in str(e) or 'Market is closed' in str(e):
+#                 excluded_symbols.add(symbol)
+#         print(f"خطأ في فتح الصفقة لـ {symbol}: {e}")
+
+
+# التحقق مما إذا كان يمكن التداول على الرمز بناءً على فترة الانتظار
+def can_trade(symbol):
+    if symbol in last_trade_time and time.time() - last_trade_time[symbol] < 300:  # انتظار 5 دقائق
+        print(f"تخطى التداول على {symbol} - لم تمر 5 دقائق منذ آخر صفقة.")
+        return False
+    return True
+
+def should_open_trade(prices):
+    rsi = calculate_rsi(prices)
+    if rsi > 70:
+        return False  # سوق مشبع بالشراء (لا تفتح صفقة شراء)
+    elif rsi < 30:
+        return True  # سوق مشبع بالبيع (افتح صفقة شراء)
+    return False
+
+# تعديل فتح الصفقات لتكون الأهداف الديناميكية
+def open_trade_with_dynamic_target(symbol, investment=2.5, base_profit_target=0.002, base_stop_loss=0.0005, timeout=30):
+        # التحقق من فترة الانتظار
+        
     # trading_status= bot_settings.trading_status()
     # if trading_status =="0":
     #     print("the trading is of can't open more trad")
     #     return
+    global balance, commission_rate
 
-    price = float(client.get_symbol_ticker(symbol=symbol)['price'])
-    avg_volatility = statistics.stdev([float(kline[4]) for kline in client.get_klines(symbol=symbol, interval=Client.KLINE_INTERVAL_5MINUTE, limit=20)])
+    # if not can_trade(symbol):
+    #     return
     
-    # تضمين العمولات وتعديل أهداف الربح والخسارة
-    profit_target = base_profit_target + avg_volatility + commission_rate
-    # print(f"profit_target: {profit_target}")
-    stop_loss = base_stop_loss + avg_volatility * 0.5 + commission_rate
-    # print(f"stop_loss: {stop_loss}")
-    target_price = price * (1 + profit_target)
-    stop_price = price * (1 - stop_loss)
-    quantity = adjust_quantity(symbol, investment / price)
-    notional_value = quantity * price
-
     if balance < investment:
         print(f"{datetime.now()} - الرصيد الحالي غير كافٍ لفتح صفقة جديدة.")
         return
-
+    
     if not check_bnb_balance():
         print(f"{datetime.now()} - الرصيد غير كافٍ من BNB لتغطية الرسوم. يرجى إيداع BNB.")
         return
 
-    # تنفيذ أمر شراء
+    
+    price = float(client.get_symbol_ticker(symbol=symbol)['price'])
+    klines = client.get_klines(symbol=symbol, interval=Client.KLINE_INTERVAL_5MINUTE, limit=5)
+    # kilnes_open = client.get_klines(symbol=symbol, interval=Client.KLINE_INTERVAL_5MINUTE, limit=5)
+    closing_prices = [float(kline[4]) for kline in klines]
+
+    avg_volatility = statistics.stdev([float(kline[4]) for kline in klines])
+    # ضبط الربح ووقف الخسارة بشكل ديناميكي
+    if not should_open_trade(closing_prices):
+        print(F"لا يجب شراء {symbol} في الوقت الحالي ")
+        return
+    profit_target = base_profit_target + avg_volatility + commission_rate
+    stop_loss = base_stop_loss + avg_volatility * 0.5 + commission_rate
+    target_price = price * (1 + profit_target)
+    stop_price = price * (1 - stop_loss)
+    quantity = adjust_quantity(symbol, investment / price)
+
+    # التأكد من توافر الرصيد قبل فتح الصفقة
+
+    # تنفيذ الصفقة
     try:
         order = client.order_market_buy(symbol=symbol, quantity=quantity)
         commission = investment * commission_rate
-        # تخزين تفاصيل الصفقة في active_trades
         active_trades[symbol] = {
             'quantity': quantity,
             'initial_price': price,
@@ -209,14 +315,14 @@ def open_trade_with_dynamic_target(symbol, investment=2.5, base_profit_target=0.
             'timeout': timeout * 60,
             'investment': investment - commission
         }
-        # balance -= investment
         adjust_balance(investment, action="buy")
+        last_trade_time[symbol] = time.time()  # تسجيل وقت الصفقة
+
         print(f"{datetime.now()} - تم فتح صفقة شراء لـ {symbol} بسعر {price}, بهدف {target_price} وإيقاف خسارة عند {stop_price}")
     except BinanceAPIException as e:
         if 'NOTIONAL' in str(e) or 'Invalid symbol' in str(e) or 'Market is closed' in str(e):
-                excluded_symbols.add(symbol)
+            excluded_symbols.add(symbol)
         print(f"خطأ في فتح الصفقة لـ {symbol}: {e}")
-
 import math
 
 def sell_trade(symbol, trade_quantity):
@@ -225,7 +331,8 @@ def sell_trade(symbol, trade_quantity):
         # الحصول على الكمية المتاحة في المحفظة
         balance_info = client.get_asset_balance(asset=symbol.replace("USDT", ""))
         available_quantity = float(balance_info['free'])
-        
+        current_price = float(client.get_symbol_ticker(symbol=symbol)['price'])
+
         # التأكد من أن الكمية تلبي الحد الأدنى لـ LOT_SIZE وتعديل الدقة المناسبة
         step_size = get_lot_size(symbol)
         if available_quantity < step_size:
@@ -239,13 +346,13 @@ def sell_trade(symbol, trade_quantity):
         if adjusted_quantity < step_size:
             print(f"{symbol} - الكمية بعد التقريب ({adjusted_quantity}) لا تزال أقل من الحد الأدنى المطلوب لـ LOT_SIZE ({step_size}).")
             return 0
-
         # تنفيذ أمر البيع
         client.order_market_sell(symbol=symbol, quantity=adjusted_quantity)
         # sale_amount = adjusted_quantity * price
         # adjust_balance(sale_amount, commission_rate, action="sell")
+        earnings = adjusted_quantity * current_price
 
-        print(f"تم تنفيذ عملية البيع لـ {symbol} بكمية {adjusted_quantity}")
+        print(f"تم تنفيذ عملية البيع لـ {symbol} بكمية {adjusted_quantity} وربح {earnings}")
         return adjusted_quantity
     except BinanceAPIException as e:
         print(f"خطأ في بيع {symbol}: {e}")
@@ -286,13 +393,16 @@ def check_trade_conditions():
                 total_sale = sold_quantity * current_price
                 commission = total_sale * commission_rate
                 net_sale = total_sale - commission  # صافي البيع بعد خصم العمولة
+                init_price = trade['initial_price'] * sold_quantity
+                earnings = trade['quantity'] * current_price - trade['initial_price'] * trade['quantity']
+
                 # تحديث الرصيد بناءً على نوع العملية (البيع)
                 adjust_balance(total_sale, action="sell")
 
-                print(f"{datetime.now()} - تم {result} الصفقة لـ {symbol} عند السعر {current_price}")
+                print(f"{datetime.now()} - تم {result} الصفقة لـ {symbol} عند السعر {current_price} وربح {earnings}")
                 with open(csv_file, mode='a', newline='', encoding='utf-8') as file:
                     writer = csv.writer(file)
-                    writer.writerow([symbol, sold_quantity, trade['initial_price'], trade['target_price'], trade['stop_price'], datetime.now(), result, balance])
+                    writer.writerow([symbol, sold_quantity, trade['initial_price'], trade['target_price'], trade['stop_price'], datetime.now(),trade['start_time'],base_profit_target, base_stop_loss, str(timeout)+'m', earnings, result, balance])
                 del active_trades[symbol]
 
         except BinanceAPIException as e:
@@ -319,7 +429,7 @@ def update_prices():
                 continue
             try:
                 current_prices[symbol] = float(client.get_symbol_ticker(symbol=symbol)['price'])
-                print(f"تم تحديث السعر لعملة {symbol}: {current_prices[symbol]}")
+                # print(f"تم تحديث السعر لعملة {symbol}: {current_prices[symbol]}")
                 if symbol not in active_trades:
                     open_trade_with_dynamic_target(symbol,investment=investment,base_profit_target=base_profit_target,base_stop_loss=base_stop_loss,timeout=timeout)
             except BinanceAPIException as e:
@@ -358,6 +468,7 @@ def run_bot():
 if __name__ == "__main__":
     if bot_settings.bot_status() != '0':
             run_bot()
+            
             
     print("Bot is turn of")
         
