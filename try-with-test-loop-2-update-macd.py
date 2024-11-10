@@ -1,3 +1,4 @@
+from ast import ExtSlice
 import json
 from binance.client import Client
 from datetime import datetime
@@ -12,7 +13,7 @@ import requests
 from config import API_KEY, API_SECRET,Settings
 # import talib  # مكتبة تحليل فني
 import ta
-
+import pandas as pd
 
 
 session = requests.Session()
@@ -40,17 +41,17 @@ active_trades = {}
 # إدارة المحفظة 
 balance = 67  # الرصيد المبدئي للبوت
 investment=6 # حجم كل صفقة
-base_profit_target=0.0036 # نسبة الربح
+base_profit_target=0.0032 # نسبة الربح
 base_stop_loss=0.007 # نسبة الخسارة
-timeout=20 # وقت انتهاء وقت الصفقة
+timeout=15 # وقت انتهاء وقت الصفقة
 commission_rate = 0.002 # نسبة العمولة للمنصة
-excluded_symbols = set('BTTCUSDT')  # قائمة العملات المستثناة بسبب أخطاء متكررة
+excluded_symbols = set()  # قائمة العملات المستثناة بسبب أخطاء متكررة
 bot_settings=Settings()
 symbols_to_trade =[]
 last_trade_time = {}
 klines_interval=Client.KLINE_INTERVAL_1MINUTE
 klines_limit=20
-top_symbols=20
+top_symbols=5
 
 
 # ملف CSV لتسجيل التداولات
@@ -59,6 +60,40 @@ if not os.path.exists(csv_file):
     with open(csv_file, mode='w', newline='', encoding='utf-8') as file:
         writer = csv.writer(file)
         writer.writerow(['الرمز', 'الكمية', 'السعر الابتدائي', 'سعر الهدف', 'سعر الإيقاف', 'وقت الاغلاق', 'وقت الفتح','نسبة الربح','نسبة الخسارة','المهلة', 'الربح','النتيجة', 'الرصيد المتبقي'])
+
+
+
+def get_klines(symbol):
+    try:
+        resp= pd.DataFrame(client.get_klines(symbol=symbol, interval=klines_interval, limit=klines_limit))
+        resp = resp.iloc[:,:6]
+        resp.columns = ['Time',"Open",'High','Low','Close','Volume']
+        resp = resp.set_index("Time")
+        resp.index = pd.to_datetime(resp.index, unit='ms')
+        resp = resp.astype(float)
+        return resp
+    except BinanceAPIException as e:
+        print(f"Error in take kline {e}")
+
+
+def claculate_macd_ema(symbol):
+    
+    kl= get_klines(symbol)
+    try:
+        if ta.trend.macd_diff(kl.Close).iloc[-1] > 0 and ta.trend.macd_diff(kl.Close).iloc[-2] < 0\
+            and ta.trend.ema_indicator(kl.Close, window=200).iloc[-1] < kl.Close.ilco[-1]:
+                return True # 'up'
+            
+        elif ta.trend.macd_diff(kl.Close).iloc[-1] < 0 and ta.trend.macd_diff(kl.Close).iloc[-2] > 0\
+            and ta.trend.ema_indicator(kl.Close, window=200).iloc[-1] > kl.Close.ilco[-1]:
+                return False # 'down'
+        print(f"{ta.trend.macd_diff(kl.Close).iloc[-1]}")
+    except Exception as e:
+        
+        print(f"error in get macd-ema claculate: {e}")
+        return False
+    # else :
+    
 
 
 # حساب RSI
@@ -272,23 +307,19 @@ def can_trade(symbol):
 #         return True  # سوق مشبع بالبيع (افتح صفقة شراء)
 #     return False
 
-def should_open_trade(prices):
+def should_open_trade(prices,symbol):
     rsi = calculate_rsi(prices)
     upper_band, lower_band = calculate_bollinger_bands(prices)
+    macd_ema= claculate_macd_ema(symbol)
     current_price = prices[-1]
+    
+    print(f"macd_ema: {macd_ema}")
 
     # RSI condition: Overbought (RSI > 70) signals a possible sell, Oversold (RSI < 30) signals a buy
-    # if rsi > 70 or current_price > upper_band:
-    #     return False  # Avoid opening a trade in overbought conditions
-
-    # if rsi < 30 or current_price < lower_band:
-    #     return True  # Open a buy trade in oversold conditions or if price crosses below lower Bollinger Band
-
-    # return False  # No trade
-    if rsi > 70 :
+    if rsi > 70 or current_price > upper_band and not macd_ema:
         return False  # Avoid opening a trade in overbought conditions
 
-    if rsi < 30 :
+    if rsi < 30 or current_price < lower_band and macd_ema:
         return True  # Open a buy trade in oversold conditions or if price crosses below lower Bollinger Band
 
     return False  # No trade
@@ -313,12 +344,12 @@ def open_trade_with_dynamic_target(symbol, investment=2.5, base_profit_target=0.
     global balance, commission_rate
 
     price = float(client.get_symbol_ticker(symbol=symbol)['price'])
-    klines = client.get_klines(symbol=symbol, interval=Client.KLINE_INTERVAL_1MINUTE, limit=8)
+    klines = client.get_klines(symbol=symbol, interval=klines_interval, limit=klines_limit)
     closing_prices = [float(kline[4]) for kline in klines]
     avg_volatility = statistics.stdev(closing_prices)
 
     # Ensure both strategies' conditions are met before opening a trade
-    if not should_open_trade(closing_prices):
+    if not should_open_trade(closing_prices,symbol):
         print(f"لا يجب شراء {symbol} في الوقت الحالي ")
         return
 
@@ -335,7 +366,7 @@ def open_trade_with_dynamic_target(symbol, investment=2.5, base_profit_target=0.
         return
 
     if not check_bnb_balance():
-        print(f"{datetime.now()} - الرصيد غير كافٍ من BNB لتغطية الرسوم. {symbol} يرجى إيداع BNB.")
+        print(f"{datetime.now()} - الرصيد غير كافٍ من BNB لتغطية الرسوم. يرجى إيداع BNB.")
         return
 
     try:
@@ -479,7 +510,7 @@ def run_bot():
     global symbols_to_trade
 
     symbols_to_trade = get_top_symbols(top_symbols)
-    symbol_update_thread = threading.Thread(target=update_symbols_periodically, args=(600,))
+    symbol_update_thread = threading.Thread(target=update_symbols_periodically, args=(1200,))
     symbol_update_thread.start()
 
     # تشغيل خيوط تحديث الأسعار ومراقبة الصفقات

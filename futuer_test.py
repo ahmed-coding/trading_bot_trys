@@ -10,12 +10,16 @@ from binance.exceptions import BinanceAPIException
 import threading
 import requests
 from config import API_TEST_KEY, API_TEST_SECRET, Settings, API_KEY, API_SECRET
-
+from binance.um_futures import UMFutures
+# from binance.
 session = requests.Session()
 session.headers.update({'timeout': '90'})
 
 
 # Initialize Binance Futures Client
+api_key = '78a36f71dd1472372e97ba6dbdfc6455028d67d13bab0084c33c29230bb2337b'
+api_secret = '160e0b56bac4dd7be0e2fe57c2e242d912b1b511ae6e59315670247b765b03bf'
+
 
 current_prices = {}
 active_trades = {}
@@ -32,8 +36,8 @@ last_trade_time = {}
 leverage=10
 
 
-client = Client(API_KEY, API_SECRET, testnet=True)
-client.futures_change_leverage(symbol='BTCUSDT', leverage=leverage)  # Default leverage; modify as needed
+client = UMFutures(api_key,api_secret, )
+# client.(symbol='BTCUSDT', leverage=leverage)  # Default leverage; modify as needed
 # client.FUTURES_API_URL = 'https://fapi.binance.com'
 
 
@@ -42,7 +46,7 @@ client.futures_change_leverage(symbol='BTCUSDT', leverage=leverage)  # Default l
 
 
 
-csv_file = 'update_trades_log_test.csv'
+csv_file = 'update_trades_log_futuer_test.csv'
 if not os.path.exists(csv_file):
     with open(csv_file, mode='w', newline='', encoding='utf-8') as file:
         writer = csv.writer(file)
@@ -109,7 +113,7 @@ def load_open_trades_from_portfolio():
 
 
 def get_top_symbols(limit=10, profit_target=0.009, rsi_threshold=70):
-    tickers = client.get_ticker()
+    tickers = client.book_ticker()
     sorted_tickers = sorted(tickers, key=lambda x: float(x['quoteVolume']), reverse=True)
     top_symbols = []
     for ticker in sorted_tickers:
@@ -281,8 +285,8 @@ def monitor_trades():
 # Run bot
 def run_bot():
     global symbols_to_trade
-    symbols_to_trade = get_top_symbols(10)
-    threading.Thread(target=update_symbols_periodically, args=(900,)).start()
+    # symbols_to_trade = get_top_symbols(10)
+    # threading.Thread(target=update_symbols_periodically, args=(900,)).start()
     threading.Thread(target=update_prices).start()
     threading.Thread(target=monitor_trades).start()
     print(f"Bot started at {datetime.now()}")
