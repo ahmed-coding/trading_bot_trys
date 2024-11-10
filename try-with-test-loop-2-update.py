@@ -37,14 +37,14 @@ client = Client(api_key, api_secret)
 # client = Client(api_key, api_secret)
 current_prices = {}
 active_trades = {}
-# إدارة المحفظة 
+# إدارة المحفظة 0
 balance = 67  # الرصيد المبدئي للبوت
 investment=6 # حجم كل صفقة
-base_profit_target=0.0036 # نسبة الربح
+base_profit_target=0.004 # نسبة الربح
 base_stop_loss=0.007 # نسبة الخسارة
-timeout=20 # وقت انتهاء وقت الصفقة
+timeout=25 # وقت انتهاء وقت الصفقة
 commission_rate = 0.002 # نسبة العمولة للمنصة
-excluded_symbols = set('BTTCUSDT')  # قائمة العملات المستثناة بسبب أخطاء متكررة
+excluded_symbols = set()  # قائمة العملات المستثناة بسبب أخطاء متكررة
 bot_settings=Settings()
 symbols_to_trade =[]
 last_trade_time = {}
@@ -163,7 +163,7 @@ def get_top_symbols(limit=20, profit_target=0.007, rsi_threshold=70):
     top_symbols = []
     
     for ticker in sorted_tickers:
-        if ticker['symbol'].endswith("USDT") and ticker['symbol'] not in excluded_symbols:
+        if ticker['symbol'].endswith("USDT") and ticker['symbol'] not in excluded_symbols and not 'BTTC' in str(ticker['symbol']):
             try:
                 klines = client.get_klines(symbol=ticker['symbol'], interval=klines_interval, limit=klines_limit)
                 closing_prices = [float(kline[4]) for kline in klines]
