@@ -10,12 +10,15 @@ import os
 import statistics
 
 # إعداد مفاتيح API الخاصة بك
-api_key = 'SR8yTMOMfCqYGHxrOUNBL1e4mTY2TTaEMNkZFIZ5glXhHeCCZKhN6CaA6CpmDkjT'
-api_secret = 'tGlNOS1KwAsEu3q6EiqM62yDjrFmYj2l41D4bajYA3KeBcjedZuVFcD8ZQFRe5eI'
+# api_key = 'SR8yTMOMfCqYGHxrOUNBL1e4mTY2TTaEMNkZFIZ5glXhHeCCZKhN6CaA6CpmDkjT'
+# api_secret = 'tGlNOS1KwAsEu3q6EiqM62yDjrFmYj2l41D4bajYA3KeBcjedZuVFcD8ZQFRe5eI'
+
+api_key = 'tweOjH1Keln44QaxLCr3naevRPgF3j3sYuOpaAg9B7nUT74MyURemvivEUcihfkt'
+api_secret = 'XLlku378D8aZzYg9JjOTtUngA8Q73xBCyy7jGVbqRYSoEICsGBfWC0cIsRptLHxb'
 
 
 client = Client(api_key, api_secret)
-# client.API_URL = 'https://testnet.binance.vision/api'
+client.API_URL = 'https://testnet.binance.vision/api'
 
 current_prices = {}
 active_trades = {}

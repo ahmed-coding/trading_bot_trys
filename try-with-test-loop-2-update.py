@@ -38,10 +38,10 @@ client = Client(api_key, api_secret)
 current_prices = {}
 active_trades = {}
 # إدارة المحفظة 0
-balance = 67  # الرصيد المبدئي للبوت
+balance = 53  # الرصيد المبدئي للبوت
 investment=6 # حجم كل صفقة
-base_profit_target=0.004 # نسبة الربح
-base_stop_loss=0.007 # نسبة الخسارة
+base_profit_target=0.0045 # نسبة الربح
+base_stop_loss=0.008 # نسبة الخسارة
 timeout=25 # وقت انتهاء وقت الصفقة
 commission_rate = 0.002 # نسبة العمولة للمنصة
 excluded_symbols = set()  # قائمة العملات المستثناة بسبب أخطاء متكررة
@@ -50,7 +50,8 @@ symbols_to_trade =[]
 last_trade_time = {}
 klines_interval=Client.KLINE_INTERVAL_1MINUTE
 klines_limit=20
-top_symbols=20
+top_symbols=[]
+count_top_symbols=70
 
 
 # ملف CSV لتسجيل التداولات
@@ -327,11 +328,11 @@ def open_trade_with_dynamic_target(symbol, investment=2.5, base_profit_target=0.
     stop_loss = base_stop_loss + avg_volatility * 0.5 + commission_rate
     target_price = price * (1 + profit_target)
     stop_price = price * (1 - stop_loss)
-    quantity = adjust_quantity(symbol, investment / price)
+    quantity = adjust_quantity(symbol, (investment) / price)
 
     # Ensure sufficient balance before opening the trade
     if balance < investment:
-        print(f"{datetime.now()} - الرصيد الحالي غير كافٍ لفتح صفقة جديدة.")
+        print(f"{datetime.now()} - {symbol} -الرصيد الحالي غير كافٍ لفتح صفقة جديدة.")
         return
 
     if not check_bnb_balance():
@@ -440,7 +441,7 @@ def check_trade_conditions():
 def update_symbols_periodically(interval=600):
     global symbols_to_trade
     while True:
-        symbols_to_trade = get_top_symbols(top_symbols)
+        symbols_to_trade = get_top_symbols(count_top_symbols)
         print(f"{datetime.now()} - تم تحديث قائمة العملات للتداول: {symbols_to_trade}")
         time.sleep(interval)
 
@@ -478,7 +479,7 @@ def monitor_trades():
 def run_bot():
     global symbols_to_trade
 
-    symbols_to_trade = get_top_symbols(top_symbols)
+    symbols_to_trade = get_top_symbols(10)
     symbol_update_thread = threading.Thread(target=update_symbols_periodically, args=(600,))
     symbol_update_thread.start()
 

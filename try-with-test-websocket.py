@@ -15,16 +15,17 @@ import statistics
 
 
 
-api_key = 'of6qt1T1MpGvlgma1qxwFTLdrGNNVsMj0fKf8LZy1sMf3OqTrwHC7BCRIkgsSsda'
-api_secret = 'MZuALJiqyWMoQ0WkPE6tqWdToGLTHLsap5m95qhPIDtizy1FPD0TQBXNvyQBhgFf'
+# api_key = 'of6qt1T1MpGvlgma1qxwFTLdrGNNVsMj0fKf8LZy1sMf3OqTrwHC7BCRIkgsSsda'
+# api_secret = 'MZuALJiqyWMoQ0WkPE6tqWdToGLTHLsap5m95qhPIDtizy1FPD0TQBXNvyQBhgFf'
 
 
-# api_key = 'tweOjH1Keln44QaxLCr3naevRPgF3j3sYuOpaAg9B7nUT74MyURemvivEUcihfkt'
-# api_secret = 'XLlku378D8aZzYg9JjOTtUngA8Q73xBCyy7jGVbqRYSoEICsGBfWC0cIsRptLHxb'
+api_key = 'tweOjH1Keln44QaxLCr3naevRPgF3j3sYuOpaAg9B7nUT74MyURemvivEUcihfkt'
+api_secret = 'XLlku378D8aZzYg9JjOTtUngA8Q73xBCyy7jGVbqRYSoEICsGBfWC0cIsRptLHxb'
+
 
 # تهيئة الاتصال ببايننس واستخدام Testnet
 client = Client(api_key, api_secret)
-# client.API_URL = 'https://testnet.binance.vision/api'
+client.API_URL = 'https://testnet.binance.vision/api'
 
 # إعداد WebSocket للأسعار الفورية لعدة عملات
 current_prices = {}
@@ -153,7 +154,7 @@ def on_open(ws):
     params = [f"{symbol.lower()}@trade" for symbol in symbols_to_trade]
     ws.send(json.dumps({"method": "SUBSCRIBE", "params": params, "id": 1}))
 
-ws = websocket.WebSocketApp("wss://stream.binance.com:9443/ws", on_open=on_open, on_message=on_message)
+ws = websocket.WebSocketApp("wss://stream.binance.com:3002/ws", on_open=on_open, on_message=on_message)
 print(f"تم بدء تشغيل البوت في {datetime.now()}")
 websocket_thread = threading.Thread(target=ws.run_forever)
 websocket_thread.start()
