@@ -103,14 +103,14 @@ class Settings:
 settings=Settings()
 
 
-# status= settings.bot_status()
-# print(status)
+status= settings.bot_status()
+print(status)
 # settings.turn_bot_of()
 # status= settings.bot_status()
 # print(status)
-# settings.turn_bot_on()
-# status= settings.bot_status()
-# print(status)
+settings.turn_bot_on()
+status= settings.bot_status()
+print(status)
 
 
 status= settings.trading_status()

@@ -11,7 +11,6 @@ import threading
 import requests
 from config import API_KEY, API_SECRET,Settings
 # import talib  # مكتبة تحليل فني
-import ta
 
 
 
@@ -38,7 +37,7 @@ client = Client(api_key, api_secret)
 current_prices = {}
 active_trades = {}
 # إدارة المحفظة 0
-balance = 53  # الرصيد المبدئي للبوت
+balance = 50  # الرصيد المبدئي للبوت
 investment=6 # حجم كل صفقة
 base_profit_target=0.0045 # نسبة الربح
 base_stop_loss=0.008 # نسبة الخسارة
@@ -286,6 +285,8 @@ def should_open_trade(prices):
     #     return True  # Open a buy trade in oversold conditions or if price crosses below lower Bollinger Band
 
     # return False  # No trade
+    
+    
     if rsi > 70 :
         return False  # Avoid opening a trade in overbought conditions
 
@@ -313,6 +314,16 @@ def should_open_trade_bollinger(prices):
 def open_trade_with_dynamic_target(symbol, investment=2.5, base_profit_target=0.002, base_stop_loss=0.0005, timeout=30):
     global balance, commission_rate
 
+    # Ensure sufficient balance before opening the trade
+    if balance < investment:
+        print(f"{datetime.now()} - {symbol} -الرصيد الحالي غير كافٍ لفتح صفقة جديدة.")
+        return
+
+    if not check_bnb_balance():
+        print(f"{datetime.now()} - الرصيد غير كافٍ من BNB لتغطية الرسوم. {symbol} يرجى إيداع BNB.")
+        return
+    
+    
     price = float(client.get_symbol_ticker(symbol=symbol)['price'])
     klines = client.get_klines(symbol=symbol, interval=Client.KLINE_INTERVAL_1MINUTE, limit=8)
     closing_prices = [float(kline[4]) for kline in klines]
@@ -330,14 +341,7 @@ def open_trade_with_dynamic_target(symbol, investment=2.5, base_profit_target=0.
     stop_price = price * (1 - stop_loss)
     quantity = adjust_quantity(symbol, (investment) / price)
 
-    # Ensure sufficient balance before opening the trade
-    if balance < investment:
-        print(f"{datetime.now()} - {symbol} -الرصيد الحالي غير كافٍ لفتح صفقة جديدة.")
-        return
 
-    if not check_bnb_balance():
-        print(f"{datetime.now()} - الرصيد غير كافٍ من BNB لتغطية الرسوم. {symbol} يرجى إيداع BNB.")
-        return
 
     try:
         # Execute the buy order
@@ -479,7 +483,7 @@ def monitor_trades():
 def run_bot():
     global symbols_to_trade
 
-    symbols_to_trade = get_top_symbols(10)
+    symbols_to_trade = get_top_symbols(5)
     symbol_update_thread = threading.Thread(target=update_symbols_periodically, args=(600,))
     symbol_update_thread.start()
 
