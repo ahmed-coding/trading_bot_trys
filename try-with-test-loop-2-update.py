@@ -37,11 +37,13 @@ client = Client(api_key, api_secret)
 current_prices = {}
 active_trades = {}
 # إدارة المحفظة 0
-balance = 50  # الرصيد المبدئي للبوت
+balance = 25  # الرصيد المبدئي للبوت
 investment=6 # حجم كل صفقة
+# base_profit_target=0.0045 # نسبة الربح
 base_profit_target=0.0045 # نسبة الربح
+# base_stop_loss=0.008 # نسبة الخسارة
 base_stop_loss=0.008 # نسبة الخسارة
-timeout=25 # وقت انتهاء وقت الصفقة
+timeout=27 # وقت انتهاء وقت الصفقة
 commission_rate = 0.002 # نسبة العمولة للمنصة
 excluded_symbols = set()  # قائمة العملات المستثناة بسبب أخطاء متكررة
 bot_settings=Settings()
@@ -91,6 +93,7 @@ def adjust_balance(amount, action="buy"):
     :return: الرصيد بعد التعديل.
     """
     global balance, commission_rate
+    
     commission = amount * commission_rate
     if action == "buy":
         balance -= (amount -( commission * 0.5))  # خصم المبلغ + العمولة
@@ -98,6 +101,9 @@ def adjust_balance(amount, action="buy"):
         balance += amount - (commission * 0.5) # إضافة المبلغ بعد خصم العمولة
     
     print(f"تم تحديث الرصيد بعد {action} - الرصيد المتبقي: {balance}")
+    if balance < investment:
+        print(f"{datetime.now()} - الرصيد الحالي لم يعُد كافٍ لفتح صفقة جديدة.")
+
     return balance
 
 
@@ -163,7 +169,7 @@ def get_top_symbols(limit=20, profit_target=0.007, rsi_threshold=70):
     top_symbols = []
     
     for ticker in sorted_tickers:
-        if ticker['symbol'].endswith("USDT") and ticker['symbol'] not in excluded_symbols and not 'BTTC' in str(ticker['symbol']):
+        if ticker['symbol'].endswith("USDT") and ticker['symbol'] not in excluded_symbols and not 'BTTC' in str(ticker['symbol']) and not 'PNUT' in str(ticker['symbol']):
             try:
                 klines = client.get_klines(symbol=ticker['symbol'], interval=klines_interval, limit=klines_limit)
                 closing_prices = [float(kline[4]) for kline in klines]
@@ -290,7 +296,7 @@ def should_open_trade(prices):
     if rsi > 70 :
         return False  # Avoid opening a trade in overbought conditions
 
-    if rsi < 30 :
+    if rsi < 20 :
         return True  # Open a buy trade in oversold conditions or if price crosses below lower Bollinger Band
 
     return False  # No trade
@@ -316,11 +322,11 @@ def open_trade_with_dynamic_target(symbol, investment=2.5, base_profit_target=0.
 
     # Ensure sufficient balance before opening the trade
     if balance < investment:
-        print(f"{datetime.now()} - {symbol} -الرصيد الحالي غير كافٍ لفتح صفقة جديدة.")
+        # print(f"{datetime.now()} - {symbol} -الرصيد الحالي غير كافٍ لفتح صفقة جديدة.")
         return
 
     if not check_bnb_balance():
-        print(f"{datetime.now()} - الرصيد غير كافٍ من BNB لتغطية الرسوم. {symbol} يرجى إيداع BNB.")
+        # print(f"{datetime.now()} - الرصيد غير كافٍ من BNB لتغطية الرسوم. {symbol} يرجى إيداع BNB.")
         return
     
     
@@ -331,7 +337,7 @@ def open_trade_with_dynamic_target(symbol, investment=2.5, base_profit_target=0.
 
     # Ensure both strategies' conditions are met before opening a trade
     if not should_open_trade(closing_prices):
-        print(f"لا يجب شراء {symbol} في الوقت الحالي ")
+        # print(f"لا يجب شراء {symbol} في الوقت الحالي ")
         return
 
     # Calculate dynamic profit target and stop loss based on volatility

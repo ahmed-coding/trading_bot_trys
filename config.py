@@ -101,3 +101,14 @@ class Settings:
             cursor.execute("""update config set value='0' where key='trading_status'""")
             self.db.commit()
         return True
+
+
+from binance.client import Client
+
+
+client = Client(API_KEY,API_SECRET)
+
+# symbol=client.get_symbol_info(symbol="BTCUSDT")
+symbol=client.get_trade_fee(symbol="BTTCUSDT")
+
+print(symbol)
