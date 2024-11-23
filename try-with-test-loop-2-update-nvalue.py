@@ -23,15 +23,15 @@ session.headers.update({'timeout': '90'})  # مثال، قد لا تكون فع�
 # إعداد مفاتيح API الخاصة بك
 
 
-# api_key = 'of6qt1T1MpGvlgma1qxwFTLdrGNNVsMj0fKf8LZy1sMf3OqTrwHC7BCRIkgsSsda'
-# api_secret = 'MZuALJiqyWMoQ0WkPE6tqWdToGLTHLsap5m95qhPIDtizy1FPD0TQBXNvyQBhgFf'
+api_key = 'of6qt1T1MpGvlgma1qxwFTLdrGNNVsMj0fKf8LZy1sMf3OqTrwHC7BCRIkgsSsda'
+api_secret = 'MZuALJiqyWMoQ0WkPE6tqWdToGLTHLsap5m95qhPIDtizy1FPD0TQBXNvyQBhgFf'
 
 
-api_key = 'tweOjH1Keln44QaxLCr3naevRPgF3j3sYuOpaAg9B7nUT74MyURemvivEUcihfkt'
-api_secret = 'XLlku378D8aZzYg9JjOTtUngA8Q73xBCyy7jGVbqRYSoEICsGBfWC0cIsRptLHxb'
+# api_key = 'tweOjH1Keln44QaxLCr3naevRPgF3j3sYuOpaAg9B7nUT74MyURemvivEUcihfkt'
+# api_secret = 'XLlku378D8aZzYg9JjOTtUngA8Q73xBCyy7jGVbqRYSoEICsGBfWC0cIsRptLHxb'
 
 # تهيئة الاتصال ببايننس واستخدام Testnet
-client = Client(api_key, api_secret,testnet=True,requests_params={'timeout':90})
+client = Client(api_key, api_secret,requests_params={'timeout':90})
 # client.API_URL = 'https://testnet.binance.vision/api'
 
 
@@ -39,9 +39,9 @@ client = Client(api_key, api_secret,testnet=True,requests_params={'timeout':90})
 current_prices = {}
 active_trades = {}
 # إدارة المحفظة 0
-balance = 1000  # الرصيد المبدئي للبوت
+balance = 39  # الرصيد المبدئي للبوت
 investment=6 # حجم كل صفقة
-base_profit_target=0.005 # نسبة الربح
+base_profit_target=0.004 # نسبة الربح
 # base_profit_target=0.005 # نسبة الربح
 # base_stop_loss=0.008 # نسبة الخسارة
 base_stop_loss=0.01 # نسبة الخسارة
@@ -54,7 +54,14 @@ last_trade_time = {}
 klines_interval=Client.KLINE_INTERVAL_5MINUTE
 klines_limit=12
 top_symbols=[]
-count_top_symbols=150
+count_top_symbols=100
+
+black_list=[
+    'SANDUSDT',
+    'BTTCUSDT',
+    'XLMUSDT',
+    'PNUTUSDT',
+]
 
 
 # ملف CSV لتسجيل التداولات
@@ -171,7 +178,7 @@ def get_top_symbols(limit=20, profit_target=0.007, rsi_threshold=70):
     top_symbols = []
     
     for ticker in sorted_tickers:
-        if ticker['symbol'].endswith("USDT") and ticker['symbol'] not in excluded_symbols and not 'BTTC' in str(ticker['symbol']):
+        if ticker['symbol'].endswith("USDT") and ticker['symbol'] not in excluded_symbols and ticker['symbol'] not in black_list :
         # if ticker['symbol'].endswith("USDT") and ticker['symbol'] not in excluded_symbols and not 'BTTC' in str(ticker['symbol']):
             try:
                 klines = client.get_klines(symbol=ticker['symbol'], interval=klines_interval, limit=klines_limit)
@@ -467,7 +474,7 @@ def update_prices():
 
     while True:
         for symbol in symbols_to_trade:
-            if symbol in excluded_symbols:
+            if symbol in excluded_symbols or symbol in black_list:
                 continue
             try:
                 current_prices[symbol] = float(client.get_symbol_ticker(symbol=symbol)['price'])
@@ -496,7 +503,7 @@ def run_bot():
     global symbols_to_trade
 
     symbols_to_trade = get_top_symbols(5)
-    symbol_update_thread = threading.Thread(target=update_symbols_periodically, args=(600,))
+    symbol_update_thread = threading.Thread(target=update_symbols_periodically, args=(1200,))
     symbol_update_thread.start()
 
     # تشغيل خيوط تحديث الأسعار ومراقبة الصفقات
