@@ -10,8 +10,10 @@ from binance.exceptions import BinanceAPIException
 import threading
 import requests
 from config import API_KEY, API_SECRET,Settings
+from ta import trend
+import numpy as np
+import pandas as pd
 # import talib  # مكتبة تحليل فني
-
 
 
 session = requests.Session()
@@ -29,21 +31,21 @@ api_key = 'tweOjH1Keln44QaxLCr3naevRPgF3j3sYuOpaAg9B7nUT74MyURemvivEUcihfkt'
 api_secret = 'XLlku378D8aZzYg9JjOTtUngA8Q73xBCyy7jGVbqRYSoEICsGBfWC0cIsRptLHxb'
 
 # تهيئة الاتصال ببايننس واستخدام Testnet
-client = Client(api_key, api_secret)
-client.API_URL = 'https://testnet.binance.vision/api'
+client = Client(api_key, api_secret,testnet=True,requests_params={'timeout':90})
+# client.API_URL = 'https://testnet.binance.vision/api'
 
 
 # client = Client(api_key, api_secret)
 current_prices = {}
 active_trades = {}
 # إدارة المحفظة 0
-balance = 100  # الرصيد المبدئي للبوت
-investment=10 # حجم كل صفقة
-base_profit_target=0.004 # نسبة الربح
+balance = 1000  # الرصيد المبدئي للبوت
+investment=6 # حجم كل صفقة
+base_profit_target=0.005 # نسبة الربح
 # base_profit_target=0.005 # نسبة الربح
 # base_stop_loss=0.008 # نسبة الخسارة
-base_stop_loss=0.0065 # نسبة الخسارة
-timeout=30 # وقت انتهاء وقت الصفقة
+base_stop_loss=0.01 # نسبة الخسارة
+timeout=20 # وقت انتهاء وقت الصفقة
 commission_rate = 0.002 # نسبة العمولة للمنصة
 excluded_symbols = set()  # قائمة العملات المستثناة بسبب أخطاء متكررة
 bot_settings=Settings()
@@ -169,7 +171,7 @@ def get_top_symbols(limit=20, profit_target=0.007, rsi_threshold=70):
     top_symbols = []
     
     for ticker in sorted_tickers:
-        if ticker['symbol'].endswith("USDT") and ticker['symbol'] not in excluded_symbols and not 'BTTC' in str(ticker['symbol']) and not 'PNUT' in str(ticker['symbol']):
+        if ticker['symbol'].endswith("USDT") and ticker['symbol'] not in excluded_symbols and not 'BTTC' in str(ticker['symbol']):
         # if ticker['symbol'].endswith("USDT") and ticker['symbol'] not in excluded_symbols and not 'BTTC' in str(ticker['symbol']):
             try:
                 klines = client.get_klines(symbol=ticker['symbol'], interval=klines_interval, limit=klines_limit)
@@ -183,7 +185,7 @@ def get_top_symbols(limit=20, profit_target=0.007, rsi_threshold=70):
                 avg_price = sum(closing_prices) / len(closing_prices)
                 volatility_ratio = stddev / avg_price
 
-                if stddev < 0.04 and volatility_ratio >= profit_target and rsi < rsi_threshold:
+                if stddev < 0.04 and volatility_ratio >= profit_target:
                     top_symbols.append(ticker['symbol'])
                     print(f"تم اختيار العملة {ticker['symbol']} بنسبة تذبذب {volatility_ratio:.4f} و RSI {rsi:.2f}")
                 
@@ -281,8 +283,8 @@ def can_trade(symbol):
 
 def should_open_trade(prices):
     rsi = calculate_rsi(prices)
-    upper_band, lower_band = calculate_bollinger_bands(prices)
-    current_price = prices[-1]
+    # upper_band, lower_band = calculate_bollinger_bands(prices)
+    # current_price = prices[-1]
 
     # RSI condition: Overbought (RSI > 70) signals a possible sell, Oversold (RSI < 30) signals a buy
     # if rsi > 70 or current_price > upper_band:
@@ -297,7 +299,7 @@ def should_open_trade(prices):
     if rsi > 70 :
         return False  # Avoid opening a trade in overbought conditions
 
-    if rsi < 40  and rsi > 50:
+    if rsi > 40  and rsi < 50:
         return True  # Open a buy trade in oversold conditions or if price crosses below lower Bollinger Band
 
     return False  # No trade
@@ -377,7 +379,8 @@ def sell_trade(symbol, trade_quantity):
     try:
         # الحصول على الكمية المتاحة في المحفظة
         balance_info = client.get_asset_balance(asset=symbol.replace("USDT", ""))
-        available_quantity = float(balance_info['free'])
+        # available_quantity = float(balance_info['free'])
+        available_quantity = trade_quantity
         current_price = float(client.get_symbol_ticker(symbol=symbol)['price'])
 
         # التأكد من أن الكمية تلبي الحد الأدنى لـ LOT_SIZE وتعديل الدقة المناسبة

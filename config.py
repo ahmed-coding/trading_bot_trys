@@ -103,12 +103,12 @@ class Settings:
         return True
 
 
-from binance.client import Client
+# from binance.client import Client
 
 
-client = Client(API_KEY,API_SECRET)
+# client = Client(API_KEY,API_SECRET)
 
-# symbol=client.get_symbol_info(symbol="BTCUSDT")
-symbol=client.get_trade_fee(symbol="BTTCUSDT")
+# # symbol=client.get_symbol_info(symbol="BTCUSDT")
+# symbol=client.get_trade_fee(symbol="BTTCUSDT")
 
-print(symbol)
+# print(symbol)

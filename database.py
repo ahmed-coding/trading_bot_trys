@@ -1,4 +1,6 @@
 import sqlite3
+from datetime import datetime
+import time
 
 
 # db= sqlite3.connect("db.sqlite3")
@@ -100,24 +102,28 @@ class Settings:
 
 
 
-settings=Settings()
+# settings=Settings()
 
 
-status= settings.bot_status()
-print(status)
-# settings.turn_bot_of()
 # status= settings.bot_status()
 # print(status)
-settings.turn_bot_on()
-status= settings.bot_status()
-print(status)
+# # settings.turn_bot_of()
+# # status= settings.bot_status()
+# # print(status)
+# settings.turn_bot_on()
+# status= settings.bot_status()
+# print(status)
 
 
-status= settings.trading_status()
-print(status)
-# settings.turn_trading_of()
-status= settings.trading_status()
-print(status)
-settings.turn_trading_on()
-status= settings.trading_status()
-print(status)
+# status= settings.trading_status()
+# print(status)
+# # settings.turn_trading_of()
+# status= settings.trading_status()
+# print(status)
+# settings.turn_trading_on()
+# status= settings.trading_status()
+# print(status)
+
+
+
+print(datetime.fromtimestamp(time.time()))
