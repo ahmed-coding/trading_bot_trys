@@ -13,6 +13,8 @@ from config import API_KEY, API_SECRET,Settings
 from ta import trend
 import numpy as np
 import pandas as pd
+import decimal
+
 # import talib  # مكتبة تحليل فني
 
 
@@ -41,11 +43,11 @@ active_trades = {}
 # إدارة المحفظة 0
 balance = 37  # الرصيد المبدئي للبوت
 investment=6 # حجم كل صفقة
-base_profit_target=0.004 # نسبة الربح
+base_profit_target=0.0035 # نسبة الربح
 # base_profit_target=0.005 # نسبة الربح
 # base_stop_loss=0.008 # نسبة الخسارة
-base_stop_loss=0.007 # نسبة الخسارة
-timeout=20 # وقت انتهاء وقت الصفقة
+base_stop_loss=0.03 # نسبة الخسارة
+timeout=40 # وقت انتهاء وقت الصفقة
 commission_rate = 0.002 # نسبة العمولة للمنصة
 excluded_symbols = set()  # قائمة العملات المستثناة بسبب أخطاء متكررة
 bot_settings=Settings()
@@ -62,7 +64,7 @@ black_list=[
     # 'XLMUSDT',
     # 'PNUTUSDT',
     # 'NEIROUSDT',
-    'SHIPUSDT',
+    # 'SHIPUSDT',
 
 ]
 
@@ -195,7 +197,7 @@ def get_top_symbols(limit=20, profit_target=0.007, rsi_threshold=70):
                 avg_price = sum(closing_prices) / len(closing_prices)
                 volatility_ratio = stddev / avg_price
 
-                if stddev < 0.04 and volatility_ratio >= profit_target :
+                if volatility_ratio >= profit_target :
                     top_symbols.append(ticker['symbol'])
                     print(f"تم اختيار العملة {ticker['symbol']} بنسبة تذبذب {volatility_ratio:.4f} و RSI {rsi:.2f}")
                 
@@ -212,8 +214,10 @@ def adjust_quantity(symbol, quantity):
     step_size = get_lot_size(symbol)
     if step_size is None:
         return quantity
-    precision = int(round(-math.log(step_size, 10), 0))
-    return round(quantity, precision)
+    # Adjust quantity to be a multiple of step_size
+    precision = decimal.Decimal(str(step_size))
+    quantity = decimal.Decimal(str(quantity))
+    return float((quantity // precision) * precision)
 
 def get_lot_size(symbol):
     exchange_info = client.get_symbol_info(symbol)
@@ -331,9 +335,9 @@ def should_open_trade_bollinger(prices):
 
 
 def check_btc_price():
-    klines = client.get_klines(symbol="BTCUSDT", interval=klines_interval, limit=6)
+    klines = client.get_klines(symbol="BTCUSDT", interval=klines_interval, limit=10)
     closing_prices = [float(kline[4]) for kline in klines]
-    rsi = calculate_rsi(closing_prices)
+    rsi = calculate_rsi(closing_prices,period=10)
     if rsi < 50:
         print (f"{datetime.now()} - لايمكن فتح صفقات جديدة الان بسبب انخفاظ سعر البيتكوين بمستوى RSI-{rsi}.")
     return True if rsi > 50 else False
@@ -348,7 +352,7 @@ def open_trade_with_dynamic_target(symbol, investment=2.5, base_profit_target=0.
         return
 
     if not check_bnb_balance():
-        print(f"{datetime.now()} - الرصيد غير كافٍ من BNB لتغطية الرسوم. {symbol} يرجى إيداع BNB.")
+        # print(f"{datetime.now()} - الرصيد غير كافٍ من BNB لتغطية الرسوم. {symbol} يرجى إيداع BNB.")
         return
     
     if not can_trade(symbol=symbol):
@@ -491,7 +495,8 @@ def update_prices():
     global symbols_to_trade
 
     while True:
-        check_btc= check_btc_price()
+        # check_btc= check_btc_price()
+        check_btc=True
         for symbol in symbols_to_trade:
             if symbol in excluded_symbols or symbol in black_list:
                 continue
@@ -504,7 +509,7 @@ def update_prices():
                 print(f"خطأ في تحديث السعر لـ {symbol}: {e}")
                 if 'NOTIONAL' in str(e) or 'Invalid symbol' in str(e):
                     excluded_symbols.add(symbol)  # Exclude symbols causing frequent errors
-                    # time.sleep(0.1)
+                    time.sleep(0.1)
 
 # مراقبة حالة الصفقات المغلقة
 def monitor_trades():
