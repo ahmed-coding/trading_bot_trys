@@ -330,6 +330,15 @@ def should_open_trade_bollinger(prices):
     return False
 
 
+def check_btc_price():
+    klines = client.get_klines(symbol="BTCUSDT", interval=klines_interval, limit=6)
+    closing_prices = [float(kline[4]) for kline in klines]
+    rsi = calculate_rsi(closing_prices)
+    if rsi < 50:
+        print (f"{datetime.now()} - لايمكن فتح صفقات جديدة الان بسبب انخفاظ سعر البيتكوين بمستوى RSI-{rsi}.")
+    return True if rsi > 50 else False
+
+
 def open_trade_with_dynamic_target(symbol, investment=2.5, base_profit_target=0.002, base_stop_loss=0.0005, timeout=30):
     global balance, commission_rate
 
@@ -339,7 +348,7 @@ def open_trade_with_dynamic_target(symbol, investment=2.5, base_profit_target=0.
         return
 
     if not check_bnb_balance():
-        # print(f"{datetime.now()} - الرصيد غير كافٍ من BNB لتغطية الرسوم. {symbol} يرجى إيداع BNB.")
+        print(f"{datetime.now()} - الرصيد غير كافٍ من BNB لتغطية الرسوم. {symbol} يرجى إيداع BNB.")
         return
     
     if not can_trade(symbol=symbol):
@@ -471,6 +480,7 @@ def check_trade_conditions():
 # تحديث قائمة الرموز بشكل دوري
 def update_symbols_periodically(interval=600):
     global symbols_to_trade
+    
     while True:
         symbols_to_trade = get_top_symbols(count_top_symbols)
         print(f"{datetime.now()} - تم تحديث قائمة العملات للتداول: {symbols_to_trade}")
@@ -481,13 +491,14 @@ def update_prices():
     global symbols_to_trade
 
     while True:
+        check_btc= check_btc_price()
         for symbol in symbols_to_trade:
             if symbol in excluded_symbols or symbol in black_list:
                 continue
             try:
                 current_prices[symbol] = float(client.get_symbol_ticker(symbol=symbol)['price'])
                 # print(f"تم تحديث السعر لعملة {symbol}: {current_prices[symbol]}")
-                if symbol not in active_trades:
+                if symbol not in active_trades and check_btc:
                     open_trade_with_dynamic_target(symbol,investment=investment,base_profit_target=base_profit_target,base_stop_loss=base_stop_loss,timeout=timeout)
             except BinanceAPIException as e:
                 print(f"خطأ في تحديث السعر لـ {symbol}: {e}")

@@ -49,7 +49,7 @@ api_secret = 'MZuALJiqyWMoQ0WkPE6tqWdToGLTHLsap5m95qhPIDtizy1FPD0TQBXNvyQBhgFf'
 # تهيئة الاتصال ببايننس واستخدام Testnet
 client = Client(api_key, api_secret,)
 
-symbol="NEIROUSDT"
+symbol="BTCUSDT"
 klines_interval="5m"
 # price = float(client.get_symbol_ticker(symbol=symbol)['price'])
 # klines = client.get_klines(symbol=symbol, interval=klines_interval, limit=41)
@@ -60,9 +60,9 @@ klines_interval="5m"
 # result= should_open_trade(closing_prices)
 
 for i in range(20):
-    klines = client.get_klines(symbol=symbol, interval=klines_interval, limit=8)
+    klines = client.get_klines(symbol=symbol, interval=klines_interval, limit=6)
     closing_prices = [float(kline[4]) for kline in klines]
-    should_open_trade(closing_prices,period=8)
+    should_open_trade(closing_prices,period=6)
     # print(ta.rsi(closing_prices,length=8))
     # print(42 < 40  and 42 > 50)
     time.sleep(0.3)
