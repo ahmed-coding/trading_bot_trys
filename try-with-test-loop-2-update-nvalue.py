@@ -43,11 +43,11 @@ active_trades = {}
 # إدارة المحفظة 0
 balance = 37  # الرصيد المبدئي للبوت
 investment=6 # حجم كل صفقة
-base_profit_target=0.0035 # نسبة الربح
-# base_profit_target=0.005 # نسبة الربح
+# base_profit_target=0.0035 # نسبة الربح
+base_profit_target=0.005 # نسبة الربح
 # base_stop_loss=0.008 # نسبة الخسارة
-base_stop_loss=0.03 # نسبة الخسارة
-timeout=40 # وقت انتهاء وقت الصفقة
+base_stop_loss=0.0015 # نسبة الخسارة
+timeout=25 # وقت انتهاء وقت الصفقة
 commission_rate = 0.002 # نسبة العمولة للمنصة
 excluded_symbols = set()  # قائمة العملات المستثناة بسبب أخطاء متكررة
 bot_settings=Settings()
