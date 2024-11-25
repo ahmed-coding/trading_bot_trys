@@ -40,29 +40,31 @@ def should_open_trade(prices,period=8):
 
 
 
-api_key = 'tweOjH1Keln44QaxLCr3naevRPgF3j3sYuOpaAg9B7nUT74MyURemvivEUcihfkt'
-api_secret = 'XLlku378D8aZzYg9JjOTtUngA8Q73xBCyy7jGVbqRYSoEICsGBfWC0cIsRptLHxb'
+api_key = 'of6qt1T1MpGvlgma1qxwFTLdrGNNVsMj0fKf8LZy1sMf3OqTrwHC7BCRIkgsSsda'
+api_secret = 'MZuALJiqyWMoQ0WkPE6tqWdToGLTHLsap5m95qhPIDtizy1FPD0TQBXNvyQBhgFf'
+
+# api_key = 'tweOjH1Keln44QaxLCr3naevRPgF3j3sYuOpaAg9B7nUT74MyURemvivEUcihfkt'
+# api_secret = 'XLlku378D8aZzYg9JjOTtUngA8Q73xBCyy7jGVbqRYSoEICsGBfWC0cIsRptLHxb'
 
 # تهيئة الاتصال ببايننس واستخدام Testnet
-# client = Client(api_key, api_secret,testnet=True)
-# client.API_URL = 'https://testnet.binance.vision/api'
+client = Client(api_key, api_secret,)
 
 symbol="NEIROUSDT"
 klines_interval="5m"
 # price = float(client.get_symbol_ticker(symbol=symbol)['price'])
-# klines = client.get_klines(symbol=symbol, interval=klines_interval, limit=8)
+# klines = client.get_klines(symbol=symbol, interval=klines_interval, limit=41)
 # closing_prices = [float(kline[4]) for kline in klines]
 # avg_volatility = statistics.stdev(closing_prices)
 
 # Ensure both strategies' conditions are met before opening a trade
 # result= should_open_trade(closing_prices)
 
-# for i in range(20):
-#     klines = client.get_klines(symbol=symbol, interval=klines_interval, limit=6)
-#     closing_prices = [float(kline[4]) for kline in klines]
-#     # should_open_trade(closing_prices,period=6)
-#     # print(ta.rsi(closing_prices,length=8))
-#     print(42 < 40  and 42 > 50)
-#     time.sleep(0.3)
-print(42 > 40  and 42 < 50)
+for i in range(20):
+    klines = client.get_klines(symbol=symbol, interval=klines_interval, limit=8)
+    closing_prices = [float(kline[4]) for kline in klines]
+    should_open_trade(closing_prices,period=8)
+    # print(ta.rsi(closing_prices,length=8))
+    # print(42 < 40  and 42 > 50)
+    time.sleep(0.3)
+# print(42 > 40  and 42 < 50)
 

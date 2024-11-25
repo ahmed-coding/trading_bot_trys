@@ -39,12 +39,12 @@ client = Client(api_key, api_secret,requests_params={'timeout':90})
 current_prices = {}
 active_trades = {}
 # إدارة المحفظة 0
-balance = 39  # الرصيد المبدئي للبوت
+balance = 37  # الرصيد المبدئي للبوت
 investment=6 # حجم كل صفقة
 base_profit_target=0.004 # نسبة الربح
 # base_profit_target=0.005 # نسبة الربح
 # base_stop_loss=0.008 # نسبة الخسارة
-base_stop_loss=0.01 # نسبة الخسارة
+base_stop_loss=0.007 # نسبة الخسارة
 timeout=20 # وقت انتهاء وقت الصفقة
 commission_rate = 0.002 # نسبة العمولة للمنصة
 excluded_symbols = set()  # قائمة العملات المستثناة بسبب أخطاء متكررة
@@ -52,15 +52,18 @@ bot_settings=Settings()
 symbols_to_trade =[]
 last_trade_time = {}
 klines_interval=Client.KLINE_INTERVAL_5MINUTE
-klines_limit=12
+klines_limit=14
 top_symbols=[]
-count_top_symbols=100
+count_top_symbols=70
 
 black_list=[
-    'SANDUSDT',
+    # 'SANDUSDT',
     'BTTCUSDT',
-    'XLMUSDT',
-    'PNUTUSDT',
+    # 'XLMUSDT',
+    # 'PNUTUSDT',
+    # 'NEIROUSDT',
+    'SHIPUSDT',
+
 ]
 
 
@@ -186,13 +189,13 @@ def get_top_symbols(limit=20, profit_target=0.007, rsi_threshold=70):
                 stddev = statistics.stdev(closing_prices)
                 
                 # حساب مؤشر RSI
-                rsi = calculate_rsi(closing_prices)
+                rsi = calculate_rsi(closing_prices,period=klines_limit)
                 
                 # اختيار العملة بناءً على التذبذب ومؤشر RSI
                 avg_price = sum(closing_prices) / len(closing_prices)
                 volatility_ratio = stddev / avg_price
 
-                if stddev < 0.04 and volatility_ratio >= profit_target:
+                if stddev < 0.04 and volatility_ratio >= profit_target :
                     top_symbols.append(ticker['symbol'])
                     print(f"تم اختيار العملة {ticker['symbol']} بنسبة تذبذب {volatility_ratio:.4f} و RSI {rsi:.2f}")
                 
@@ -276,7 +279,7 @@ def get_lot_size(symbol):
 # التحقق مما إذا كان يمكن التداول على الرمز بناءً على فترة الانتظار
 def can_trade(symbol):
     if symbol in last_trade_time and time.time() - last_trade_time[symbol] < 300:  # انتظار 5 دقائق
-        print(f"تخطى التداول على {symbol} - لم تمر 5 دقائق منذ آخر صفقة.")
+        # print(f"تخطى التداول على {symbol} - لم تمر 5 دقائق منذ آخر صفقة.")
         return False
     return True
 
@@ -288,8 +291,8 @@ def can_trade(symbol):
 #         return True  # سوق مشبع بالبيع (افتح صفقة شراء)
 #     return False
 
-def should_open_trade(prices):
-    rsi = calculate_rsi(prices)
+def should_open_trade(prices,period=14):
+    rsi = calculate_rsi(prices,period=period)
     # upper_band, lower_band = calculate_bollinger_bands(prices)
     # current_price = prices[-1]
 
@@ -339,14 +342,18 @@ def open_trade_with_dynamic_target(symbol, investment=2.5, base_profit_target=0.
         # print(f"{datetime.now()} - الرصيد غير كافٍ من BNB لتغطية الرسوم. {symbol} يرجى إيداع BNB.")
         return
     
-    
+    if not can_trade(symbol=symbol):
+        # print(f"{datetime.now()} -لقدم تم فتح صفقة حديثاً لعملة {symbol} سيتم الانتظار .")
+
+        return
+        
     price = float(client.get_symbol_ticker(symbol=symbol)['price'])
     klines = client.get_klines(symbol=symbol, interval=klines_interval, limit=8)
     closing_prices = [float(kline[4]) for kline in klines]
     avg_volatility = statistics.stdev(closing_prices)
 
     # Ensure both strategies' conditions are met before opening a trade
-    if not should_open_trade(closing_prices):
+    if not should_open_trade(closing_prices,8):
         # print(f"لا يجب شراء {symbol} في الوقت الحالي ")
         return
 
@@ -373,7 +380,7 @@ def open_trade_with_dynamic_target(symbol, investment=2.5, base_profit_target=0.
             'investment': investment - commission
         }
         adjust_balance(investment, action="buy")
-        last_trade_time[symbol] = time.time()  # Record the trade timestamp
+        # last_trade_time[symbol] = time.time()  # Record the trade timestamp
         print(f"{datetime.now()} - تم فتح صفقة شراء لـ {symbol} بسعر {price}, بهدف {target_price} وإيقاف خسارة عند {stop_price}")
     except BinanceAPIException as e:
         if 'NOTIONAL' in str(e) or 'Invalid symbol' in str(e)  or 'Market is closed' in str(e):
@@ -406,6 +413,7 @@ def sell_trade(symbol, trade_quantity):
         # تنفيذ أمر البيع
         client.order_market_sell(symbol=symbol, quantity=adjusted_quantity)
         # sale_amount = adjusted_quantity * price
+        last_trade_time[symbol] = time.time()  # Record the trade timestamp
         # adjust_balance(sale_amount, commission_rate, action="sell")
         earnings = adjusted_quantity * current_price
 
@@ -485,13 +493,13 @@ def update_prices():
                 print(f"خطأ في تحديث السعر لـ {symbol}: {e}")
                 if 'NOTIONAL' in str(e) or 'Invalid symbol' in str(e):
                     excluded_symbols.add(symbol)  # Exclude symbols causing frequent errors
-                    time.sleep(0.1)
+                    # time.sleep(0.1)
 
 # مراقبة حالة الصفقات المغلقة
 def monitor_trades():
     while True:
         check_trade_conditions()
-        time.sleep(0.1)
+        # time.sleep(0.1)
 
 
 # load_open_trades_from_portfolio()
@@ -503,7 +511,7 @@ def run_bot():
     global symbols_to_trade
 
     symbols_to_trade = get_top_symbols(5)
-    symbol_update_thread = threading.Thread(target=update_symbols_periodically, args=(1200,))
+    symbol_update_thread = threading.Thread(target=update_symbols_periodically, args=(600,))
     symbol_update_thread.start()
 
     # تشغيل خيوط تحديث الأسعار ومراقبة الصفقات
