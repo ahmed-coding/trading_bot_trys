@@ -99,10 +99,39 @@ class Settings:
             cursor.execute("""update config set value='0' where key='trading_status'""")
             self.db.commit()
         return True
+    
+    def colose_all_status(self):
+        cursor = self.db.cursor()
+        cursor.execute("select value from config where key='close_all';")
+        row=cursor.fetchone()
+        if row is None :
+            self.db.execute("""insert into `config` (`key`, `value`) VALUES (
+                'close_all','0'
+            ); """)
+            self.db.commit()
+            cursor.execute("select value from config where key='close_all';")
+            row=cursor.fetchone()            # self.bot_status()
+        return row[0]
+
+    def close_all_on(self):
+        if self.colose_all_status() !='1':
+            cursor = self.db.cursor()
+            cursor.execute("""update config set value='1' where key='close_all'""")
+            self.db.commit()
+        return True
+
+    
+    def close_all_off(self):
+        if self.colose_all_status() !='0':
+            cursor = self.db.cursor()
+            cursor.execute("""update config set value='0' where key='close_all'""")
+            self.db.commit()
+        return True
+    
 
 
 
-# settings=Settings()
+settings=Settings()
 
 
 # status= settings.bot_status()
@@ -115,8 +144,8 @@ class Settings:
 # print(status)
 
 
-# status= settings.trading_status()
-# print(status)
+status= settings.colose_all_status()
+print(status)
 # # settings.turn_trading_of()
 # status= settings.trading_status()
 # print(status)
@@ -126,4 +155,4 @@ class Settings:
 
 
 
-print(datetime.fromtimestamp(time.time()))
+# print(datetime.fromtimestamp(time.time()))

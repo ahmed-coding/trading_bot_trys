@@ -2,6 +2,8 @@
 import time
 from binance.client import Client
 # import pandas_ta as ta
+import talib as ta
+import pandas as pd
 
 
 # حساب RSI
@@ -62,7 +64,14 @@ klines_interval="30m"
 for i in range(100):
     klines = client.get_klines(symbol=symbol, interval=klines_interval, limit=10)
     closing_prices = [float(kline[4]) for kline in klines]
-    should_open_trade(closing_prices,period=10)
+    df = pd.DataFrame(klines, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume', 
+                                       'close_time', 'quote_asset_volume', 'num_trades', 
+                                       'taker_buy_base_asset_volume', 'taker_buy_quote_asset_volume', 
+                                       'ignore'])
+    df['close'] = df['close'].astype(float)
+    df['SMA'] = ta.SMA(df['close'], timeperiod=5)
+    # should_open_trade(closing_prices,period=10)
+    print(ta.RSI(closing_prices))
     # print(ta.rsi(closing_prices,length=8))
     # print(42 < 40  and 42 > 50)
     time.sleep(0.3)

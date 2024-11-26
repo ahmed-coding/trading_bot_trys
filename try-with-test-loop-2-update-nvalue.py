@@ -10,13 +10,12 @@ from binance.exceptions import BinanceAPIException
 import threading
 import requests
 from config import API_KEY, API_SECRET,Settings
-from ta import trend
 import numpy as np
 import pandas as pd
 import decimal
-
-# import talib  # مكتبة تحليل فني
-
+# import talib
+# # import talib  # مكتبة تحليل فني
+# talib.atexit.register
 
 session = requests.Session()
 
@@ -41,13 +40,13 @@ client = Client(api_key, api_secret,requests_params={'timeout':90})
 current_prices = {}
 active_trades = {}
 # إدارة المحفظة 0
-balance = 37  # الرصيد المبدئي للبوت
+balance = 36.11 # الرصيد المبدئي للبوت
 investment=6 # حجم كل صفقة
-# base_profit_target=0.0035 # نسبة الربح
-base_profit_target=0.005 # نسبة الربح
-# base_stop_loss=0.008 # نسبة الخسارة
-base_stop_loss=0.0015 # نسبة الخسارة
-timeout=25 # وقت انتهاء وقت الصفقة
+base_profit_target=0.001 # نسبة الربح
+# base_profit_target=0.005 # نسبة الربح
+base_stop_loss=0.02 # نسبة الخسارة
+# base_stop_loss=0.000 # نسبة الخسارة
+timeout=15 # وقت انتهاء وقت الصفقة
 commission_rate = 0.002 # نسبة العمولة للمنصة
 excluded_symbols = set()  # قائمة العملات المستثناة بسبب أخطاء متكررة
 bot_settings=Settings()
@@ -59,12 +58,20 @@ top_symbols=[]
 count_top_symbols=70
 
 black_list=[
-    # 'SANDUSDT',
+    'SANDUSDT',
     'BTTCUSDT',
     # 'XLMUSDT',
-    # 'PNUTUSDT',
+    'PNUTUSDT',
     # 'NEIROUSDT',
     # 'SHIPUSDT',
+    'NEIROUSDT',
+    'FTMUSDT',
+    'KDAUSDT',
+    'NEARUSDT',
+    'KSMUSDT',
+    'ELFUSDT',
+
+
 
 ]
 
@@ -197,7 +204,7 @@ def get_top_symbols(limit=20, profit_target=0.007, rsi_threshold=70):
                 avg_price = sum(closing_prices) / len(closing_prices)
                 volatility_ratio = stddev / avg_price
 
-                if volatility_ratio >= profit_target :
+                if stddev < 0.04 and volatility_ratio >= profit_target :
                     top_symbols.append(ticker['symbol'])
                     print(f"تم اختيار العملة {ticker['symbol']} بنسبة تذبذب {volatility_ratio:.4f} و RSI {rsi:.2f}")
                 
@@ -282,7 +289,7 @@ def get_lot_size(symbol):
 
 # التحقق مما إذا كان يمكن التداول على الرمز بناءً على فترة الانتظار
 def can_trade(symbol):
-    if symbol in last_trade_time and time.time() - last_trade_time[symbol] < 300:  # انتظار 5 دقائق
+    if symbol in last_trade_time and time.time() - last_trade_time[symbol] < 60:  # انتظار 5 دقائق
         # print(f"تخطى التداول على {symbol} - لم تمر 5 دقائق منذ آخر صفقة.")
         return False
     return True
@@ -345,7 +352,11 @@ def check_btc_price():
 
 def open_trade_with_dynamic_target(symbol, investment=2.5, base_profit_target=0.002, base_stop_loss=0.0005, timeout=30):
     global balance, commission_rate
-
+    
+    # trading_status= bot_settings.trading_status()
+    # if trading_status =="0":
+    #     # print("the trading is of can't open more trad")
+    #     return
     # Ensure sufficient balance before opening the trade
     if balance < investment:
         # print(f"{datetime.now()} - {symbol} -الرصيد الحالي غير كافٍ لفتح صفقة جديدة.")
@@ -438,6 +449,8 @@ def sell_trade(symbol, trade_quantity):
 
 def check_trade_conditions():
     global balance
+    
+    
     for symbol, trade in list(active_trades.items()):
         try:
             current_price = float(client.get_symbol_ticker(symbol=symbol)['price'])
@@ -450,6 +463,10 @@ def check_trade_conditions():
         result = None
         sold_quantity = 0
         total_sale = 0
+        # close_all= bot_settings.colose_all_status()
+        # if close_all =="0":
+        #     # print("the trading is of can't open more trad")
+        #     return
         try:
             if current_price >= trade['target_price']:
                 sold_quantity = sell_trade(symbol, trade['quantity'])
@@ -460,7 +477,10 @@ def check_trade_conditions():
             elif time.time() - trade['start_time'] >= trade['timeout']:
                 sold_quantity = sell_trade(symbol, trade['quantity'])
                 result = 'انتهاء المهلة' if sold_quantity > 0 else None
-
+            # elif close_all =="1":
+            #     sold_quantity = sell_trade(symbol, trade['quantity'])
+            #     result = 'إيقاف اجباري' if sold_quantity > 0 else None
+                
             # Handle trade results and balance update
             if result and sold_quantity > 0:
                 total_sale = sold_quantity * current_price
