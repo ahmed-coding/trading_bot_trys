@@ -40,22 +40,24 @@ client = Client(api_key, api_secret,requests_params={'timeout':90})
 current_prices = {}
 active_trades = {}
 # إدارة المحفظة 0
-balance = 36.11 # الرصيد المبدئي للبوت
+balance = 34.4 # الرصيد المبدئي للبوت
 investment=6 # حجم كل صفقة
 base_profit_target=0.001 # نسبة الربح
 # base_profit_target=0.005 # نسبة الربح
-base_stop_loss=0.02 # نسبة الخسارة
+base_stop_loss=0.007 # نسبة الخسارة
 # base_stop_loss=0.000 # نسبة الخسارة
-timeout=15 # وقت انتهاء وقت الصفقة
+timeout=45 # وقت انتهاء وقت الصفقة
 commission_rate = 0.002 # نسبة العمولة للمنصة
 excluded_symbols = set()  # قائمة العملات المستثناة بسبب أخطاء متكررة
 bot_settings=Settings()
 symbols_to_trade =[]
 last_trade_time = {}
-klines_interval=Client.KLINE_INTERVAL_5MINUTE
+klines_interval=Client.KLINE_INTERVAL_3MINUTE
 klines_limit=14
 top_symbols=[]
 count_top_symbols=70
+analize_period=8
+
 
 black_list=[
     'SANDUSDT',
@@ -64,12 +66,12 @@ black_list=[
     'PNUTUSDT',
     # 'NEIROUSDT',
     # 'SHIPUSDT',
-    'NEIROUSDT',
+    # 'NEIROUSDT',
     'FTMUSDT',
     'KDAUSDT',
-    'NEARUSDT',
-    'KSMUSDT',
-    'ELFUSDT',
+    'POLYXUSDT',
+    'SCUSDT',
+    'ZRXUSDT',
 
 
 
@@ -289,7 +291,7 @@ def get_lot_size(symbol):
 
 # التحقق مما إذا كان يمكن التداول على الرمز بناءً على فترة الانتظار
 def can_trade(symbol):
-    if symbol in last_trade_time and time.time() - last_trade_time[symbol] < 60:  # انتظار 5 دقائق
+    if symbol in last_trade_time and time.time() - last_trade_time[symbol] < 30:  # انتظار 5 دقائق
         # print(f"تخطى التداول على {symbol} - لم تمر 5 دقائق منذ آخر صفقة.")
         return False
     return True
@@ -320,11 +322,36 @@ def should_open_trade(prices,period=14):
     if rsi > 70 :
         return False  # Avoid opening a trade in overbought conditions
 
-    if rsi > 40  and rsi < 50:
+    if rsi > 30  and rsi < 40:
         return True  # Open a buy trade in oversold conditions or if price crosses below lower Bollinger Band
 
     return False  # No trade
 
+
+
+def should_close_trade(prices,period=14):
+    
+    rsi = calculate_rsi(prices,period=period)
+    # upper_band, lower_band = calculate_bollinger_bands(prices)
+    # current_price = prices[-1]
+
+    # RSI condition: Overbought (RSI > 70) signals a possible sell, Oversold (RSI < 30) signals a buy
+    # if rsi > 70 or current_price > upper_band:
+    #     return False  # Avoid opening a trade in overbought conditions
+
+    # if rsi < 30 or current_price < lower_band:
+    #     return True  # Open a buy trade in oversold conditions or if price crosses below lower Bollinger Band
+
+    # return False  # No trade
+    
+    
+    if rsi > 70 or rsi < 25 :
+        return True  # Avoid opening a trade in overbought conditions
+
+    if rsi > 30  and rsi < 40:
+        return False  # Open a buy trade in oversold conditions or if price crosses below lower Bollinger Band
+
+    return False  # No trade
 
 
 # Determine if a Bollinger Bands reversal condition is met for opening trades
@@ -372,12 +399,12 @@ def open_trade_with_dynamic_target(symbol, investment=2.5, base_profit_target=0.
         return
         
     price = float(client.get_symbol_ticker(symbol=symbol)['price'])
-    klines = client.get_klines(symbol=symbol, interval=klines_interval, limit=8)
+    klines = client.get_klines(symbol=symbol, interval=klines_interval, limit=analize_period)
     closing_prices = [float(kline[4]) for kline in klines]
     avg_volatility = statistics.stdev(closing_prices)
 
     # Ensure both strategies' conditions are met before opening a trade
-    if not should_open_trade(closing_prices,8):
+    if not should_open_trade(closing_prices,analize_period):
         # print(f"لا يجب شراء {symbol} في الوقت الحالي ")
         return
 
@@ -453,6 +480,9 @@ def check_trade_conditions():
     
     for symbol, trade in list(active_trades.items()):
         try:
+            klines = client.get_klines(symbol=symbol, interval=klines_interval, limit=analize_period)
+            closing_prices = [float(kline[4]) for kline in klines]
+            
             current_price = float(client.get_symbol_ticker(symbol=symbol)['price'])
             current_prices[symbol] = current_price
         except BinanceAPIException as e:
@@ -477,9 +507,9 @@ def check_trade_conditions():
             elif time.time() - trade['start_time'] >= trade['timeout']:
                 sold_quantity = sell_trade(symbol, trade['quantity'])
                 result = 'انتهاء المهلة' if sold_quantity > 0 else None
-            # elif close_all =="1":
-            #     sold_quantity = sell_trade(symbol, trade['quantity'])
-            #     result = 'إيقاف اجباري' if sold_quantity > 0 else None
+            elif should_close_trade(closing_prices,analize_period):
+                sold_quantity = sell_trade(symbol, trade['quantity'])
+                result = 'إيقاف اجباري' if sold_quantity > 0 else None
                 
             # Handle trade results and balance update
             if result and sold_quantity > 0:
@@ -535,7 +565,7 @@ def update_prices():
 def monitor_trades():
     while True:
         check_trade_conditions()
-        # time.sleep(0.1)
+        time.sleep(0.1)
 
 
 # load_open_trades_from_portfolio()
