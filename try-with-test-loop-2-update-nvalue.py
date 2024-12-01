@@ -40,13 +40,13 @@ client = Client(api_key, api_secret,requests_params={'timeout':90})
 current_prices = {}
 active_trades = {}
 # إدارة المحفظة 0
-balance = 34.4 # الرصيد المبدئي للبوت
+balance = 25 # الرصيد المبدئي للبوت
 investment=6 # حجم كل صفقة
-base_profit_target=0.001 # نسبة الربح
+base_profit_target=0.005 # نسبة الربح
 # base_profit_target=0.005 # نسبة الربح
-base_stop_loss=0.007 # نسبة الخسارة
+base_stop_loss=0.1 # نسبة الخسارة
 # base_stop_loss=0.000 # نسبة الخسارة
-timeout=45 # وقت انتهاء وقت الصفقة
+timeout=60 # وقت انتهاء وقت الصفقة
 commission_rate = 0.002 # نسبة العمولة للمنصة
 excluded_symbols = set()  # قائمة العملات المستثناة بسبب أخطاء متكررة
 bot_settings=Settings()
@@ -62,12 +62,12 @@ analize_period=8
 black_list=[
     'SANDUSDT',
     'BTTCUSDT',
-    # 'XLMUSDT',
-    'PNUTUSDT',
+    'XLMUSDT',
+    # 'PNUTUSDT',
     # 'NEIROUSDT',
-    # 'SHIPUSDT',
+    'POWRUSDT',
     # 'NEIROUSDT',
-    'FTMUSDT',
+    # 'FTMUSDT',
     'KDAUSDT',
     'POLYXUSDT',
     'SCUSDT',
@@ -319,10 +319,10 @@ def should_open_trade(prices,period=14):
     # return False  # No trade
     
     
-    if rsi > 70 :
+    if rsi > 50 :
         return False  # Avoid opening a trade in overbought conditions
 
-    if rsi > 30  and rsi < 40:
+    if rsi > 25  and rsi < 45:
         return True  # Open a buy trade in oversold conditions or if price crosses below lower Bollinger Band
 
     return False  # No trade
@@ -345,10 +345,10 @@ def should_close_trade(prices,period=14):
     # return False  # No trade
     
     
-    if rsi > 70 or rsi < 25 :
+    if rsi > 50 or rsi < 15 :
         return True  # Avoid opening a trade in overbought conditions
 
-    if rsi > 30  and rsi < 40:
+    if rsi > 27  and rsi < 45:
         return False  # Open a buy trade in oversold conditions or if price crosses below lower Bollinger Band
 
     return False  # No trade
@@ -507,9 +507,9 @@ def check_trade_conditions():
             elif time.time() - trade['start_time'] >= trade['timeout']:
                 sold_quantity = sell_trade(symbol, trade['quantity'])
                 result = 'انتهاء المهلة' if sold_quantity > 0 else None
-            elif should_close_trade(closing_prices,analize_period):
-                sold_quantity = sell_trade(symbol, trade['quantity'])
-                result = 'إيقاف اجباري' if sold_quantity > 0 else None
+            # elif should_close_trade(closing_prices,analize_period):
+            #     sold_quantity = sell_trade(symbol, trade['quantity'])
+            #     result = 'إيقاف اجباري' if sold_quantity > 0 else None
                 
             # Handle trade results and balance update
             if result and sold_quantity > 0:
