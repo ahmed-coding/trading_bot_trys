@@ -200,9 +200,9 @@ result=[]
 # تنفيذ الباكتيست
 if __name__ == "__main__":
     # استخدم بيانات Binance أو بيانات جاهزة
-    for symbol in get_top_symbols(10):
+    for symbol in get_top_symbols(100):
         # data = fetch_binance_data(symbol, Client.KLINE_INTERVAL_3MINUTE, "48 hours ago UTC", "30 Nov 2023")
-        data = fetch_binance_data(symbol, Client.KLINE_INTERVAL_1MINUTE, "3 hours ago UTC", "30 Nov 2023")
+        data = fetch_binance_data(symbol, Client.KLINE_INTERVAL_3MINUTE, "12 hours ago UTC", "30 Nov 2023")
 
         # if data is None or data == []:
         #     # print(f"the data in symbol {symbol} is empty") 
